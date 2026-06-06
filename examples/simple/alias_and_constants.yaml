@@ -1,0 +1,21 @@
+# Standalone example demonstrating constants and aliases.
+module:
+  name: alias_and_constants
+
+constants:
+  BASE: 3
+  INCREMENT: 2
+
+aliases:
+  threshold: input_x
+
+cells:
+  - id: 1
+    contents:
+      - input_x = 1
+      - output_y = 0
+    input: [input_x]
+    output: [output_y]
+
+rules:
+  - threshold + BASE + INCREMENT -> output_y

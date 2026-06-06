@@ -1,0 +1,58 @@
+ # FSM example with two coordinated state variables.
+module:
+  name: dual_fsm_demo
+
+cells:
+  - id: 1
+    contents:
+      - ctrl_state = 0
+      - pulse_state = 0
+      - start = 0
+      - stop = 0
+      - led = 0
+    input: [start, stop]
+    output: [led]
+
+fsm:
+  - name: ctrl
+    variable: ctrl_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: start > 0
+              then: ACTIVE -> ctrl_state
+      - ACTIVE:
+          rules:
+            - if: stop > 0
+              then: IDLE -> ctrl_state
+
+  - name: pulse
+    variable: pulse_state
+    initial: LOW
+    states:
+      - LOW:
+          rules:
+            - if: ctrl_state == ctrl.ACTIVE
+              then:
+                - HIGH -> pulse_state
+                - led * 0 + 1 -> led
+              else:
+                - led * 0 + 0 -> led
+      - HIGH:
+          rules:
+            - if: ctrl_state == ctrl.IDLE
+              then:
+                - LOW -> pulse_state
+                - led * 0 + 0 -> led
+              else:
+                - led * 0 + 1 -> led
+
+#Example of input CSV
+# start,stop
+#0,0
+#1,0
+#0,0
+#0,0
+#1,1
+#0,0

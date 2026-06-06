@@ -1,0 +1,14 @@
+cells:
+  - id: 1
+    contents:
+      - x = 0, y = 0, E = 0, z = 0, u = 1
+      #- x = 0, y = 4, E = 3, z = 4, u = 0
+    input: [ x ]
+    output: [ y,z ]
+rules:
+  - E > x | x + 3 -> x
+  - E + 1 -> E
+  - 0*z + x + y -> z
+  - (E > u || E > x || E > y) | u + x + y -> y
+
+

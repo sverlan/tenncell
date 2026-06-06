@@ -1,0 +1,50 @@
+"""Configuration objects for TENNCell Webots controller generation."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+@dataclass(slots=True)
+class WebotsBindingConfig:
+    """Describe one TENNCell variable bound to a Webots device.
+
+    Args:
+        device: Webots device name passed to ``robot.getDevice()``.
+        read_method: Optional method called on the device to read a TENNCell input.
+        write_method: Optional method called on the device to write a TENNCell
+            output or initialization value.
+
+    Validation assumptions:
+        At least one method must be present. The Webots transformer validates
+        that TENNCell input variables have a read method and output/init variables
+        have a write method before code generation.
+    """
+
+    device: str
+    read_method: str | None = None
+    write_method: str | None = None
+
+
+@dataclass(slots=True)
+class WebotsConfig:
+    """Webots controller generation settings parsed from the YAML section.
+
+    Args:
+        controller_name: Human-readable controller name used in generated
+            comments and diagnostics.
+        timestep: Optional fixed Webots timestep. When omitted, generated code
+            calls ``robot.getBasicTimeStep()``.
+        bindings: Mapping from TENNCell variable names to Webots device bindings.
+        init: One-time initialization values written before the controller loop.
+
+    Validation assumptions:
+        The Webots YAML parser supplies normalized special values such as
+        ``inf`` and ``nan``. The transformer validates that bindings and init
+        entries reference variables present in the resolved TENNCell model.
+    """
+
+    controller_name: str
+    timestep: int | None = None
+    bindings: dict[str, WebotsBindingConfig] = field(default_factory=dict)
+    init: dict[str, object] = field(default_factory=dict)

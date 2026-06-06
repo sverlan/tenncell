@@ -1,0 +1,11 @@
+schema:
+  name: uart_tx
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: tx
+      direction: output
+      width: 1
+      signed: false

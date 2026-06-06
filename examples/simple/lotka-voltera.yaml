@@ -1,0 +1,32 @@
+module:
+  name: Lotka_Volterra
+  description: "Lotka-Volterra example"
+  #zero_reset_mode: true
+constants:
+  dt: 0.01
+  a: 1.0
+  b: 0.1
+  d: 0.075
+  g: 1.5
+cells:
+  - id: 1
+    contents:
+      - x=40, y=9 
+#      - x=60, y=5 
+      -  stop = 0
+      - t = 0
+    input: []
+    output: [t,x,y]
+
+rules:
+
+    # time
+    - t + dt -> t
+    # update
+    - if: x + dt * ( a*x - b*x*y) > 0
+      then: x + dt * ( a*x - b*x*y) -> x
+      else: 0*x -> x
+    - if:  y + dt * ( d*x*y - g*y) > 0
+      then: y + dt * ( d*x*y - g*y) -> y
+      else: 0*y -> y
+

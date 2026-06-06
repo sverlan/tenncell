@@ -1,0 +1,6 @@
+webots:
+  bindings:
+    led:
+      device: led
+      write_method: setValue
+  init: []

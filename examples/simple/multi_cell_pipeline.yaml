@@ -1,0 +1,22 @@
+# Multi-cell pipeline example showing values flowing from one cell to the next.
+module:
+  name: multi_cell_pipeline
+
+cells:
+  - id: 1
+    contents:
+      - source = 1
+      - stage1 = 0
+    input: [source]
+    output: [source, stage1]
+
+  - id: 2
+    contents:
+      - stage2 = 0
+      - sink = 0
+    output: [stage2, sink]
+
+rules:
+  - source + 1 -> stage1
+  - stage1 + 2 -> stage2
+  - stage2 + source -> sink

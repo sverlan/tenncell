@@ -1,0 +1,21 @@
+module:
+  name: child
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    sig:
+      direction: input
+      width: 32
+      signed: true
+cells:
+  - id: 1
+    contents:
+      - sig = 0
+    input: [sig]
+rules: []

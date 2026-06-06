@@ -1,0 +1,73 @@
+module:
+  name: fpga_blink_uart
+  zero_reset_mode: true
+
+constants:
+  BLINK_DELAY: 27000000
+
+imports:
+  - module: blink_uart_tx_driver.yaml
+    as: txdrv0
+    connections:
+      trigger: toggle_pulse
+      led_state: led
+      uart_ready: uart_ready
+
+cells:
+  - id: 1
+    contents:
+      - counter = 0
+      - led = 0
+      - toggle_pulse = 0
+      - uart_ready = 0
+      - tx_data = 0
+      - tx_valid = 0
+      - uart_tx = 0
+    output: [led, uart_tx]
+
+rules:
+  # Count until the blink period expires.
+  - counter < BLINK_DELAY | counter + 1 -> counter
+  - counter < BLINK_DELAY | led -> led
+
+  # If the UART cannot accept a byte yet, hold the current LED state and keep the counter saturated.
+  - counter >= BLINK_DELAY && uart_ready == 0 | counter -> counter
+  - counter >= BLINK_DELAY && uart_ready == 0 | led -> led
+
+  # When the delay expires and the UART is ready, toggle the LED and pulse the TX driver.
+  - counter >= BLINK_DELAY && uart_ready == 1 && led == 0 | 1 -> led
+  - counter >= BLINK_DELAY && uart_ready == 1 && led > 0 | 0 -> led
+  - counter >= BLINK_DELAY && uart_ready == 1 | 1 -> toggle_pulse
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 40
+    frac_bits: 10  
+  clock: clk
+  reset: rst
+  ports:
+    led:
+      direction: output
+      kind: logic
+      width: 1
+      signed: false
+    uart_tx:
+      direction: output
+      kind: logic
+      width: 1
+      signed: false
+  externals:
+    uart_tx0:
+      header: uart_tx.header.yaml
+      parameters:
+        CLOCK_HZ: 27000000
+        BAUD_RATE: 115200
+      connections:
+        clk: clk
+        rst: rst
+        data_in: tx_data
+        valid: tx_valid
+        ready: uart_ready
+        tx: uart_tx

@@ -1,0 +1,45 @@
+module:
+  name: fsm_if_demo
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    x:
+      direction: input
+      width: 32
+      signed: true
+    y:
+      direction: output
+      width: 32
+      signed: true
+cells:
+  - id: 1
+    contents:
+      - ctrl_state = 0
+      - x = 0
+      - y = 0
+    input: [x]
+    output: [y]
+fsm:
+  - name: ctrl
+    variable: ctrl_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: x > 2
+              then:
+                - RUN -> ctrl_state
+                - 1 -> y
+              else:
+                - 0 -> y
+      - RUN:
+          rules:
+            - if: x > 10
+              then: 2 -> y
+              else: 1 -> y

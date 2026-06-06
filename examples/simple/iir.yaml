@@ -1,0 +1,13 @@
+description: "IIR filter"
+cells:
+    - id: 1
+      contents:
+        - x=0
+        - y=0, y_prev=0
+      input: [x]
+      output: [y]
+rules:
+    - 0.6 * x + 0.4 * y_prev -> y
+    - y -> y_prev
+    - 0 * y -> y
+    - 0 * y_prev -> y_prev

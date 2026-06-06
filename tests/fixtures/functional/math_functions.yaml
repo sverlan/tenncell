@@ -1,0 +1,31 @@
+name: "Math Functions Test System"
+description: "A system to test various mathematical functions with variable dependencies"
+
+cells:
+  - id: 1
+    contents:
+      # Direct assignment
+      - x = 2.0
+      - y = 3.0
+      - z = 4.0
+      # Variable dependencies - calculated during initialization
+      - a = sin(x)      # Uses x in initialization
+      - b = pow(y, 2)   # Uses y in initialization
+      - c = a + b       # Uses other variables (a and b) in initialization
+      # Result variables
+      - trigResult = 0.0
+      - powerResult = 0.0
+      - nestedResult = 0.0
+      - standardFuncResult = 0.0
+      - complexResult = 0.0
+      - step = 0.0
+      - z1 = 2.0
+      - z1 = 3.0
+rules:
+  # Variables used in these rules (x,y,z,a,b,c) will be reset to 0 after rule execution
+  - sin(x) * cos(y) -> trigResult  # x,y will be reset to 0
+  - pow(a, b) -> powerResult       # a,b will be reset to 0
+  - sqrt(pow(sin(x), 2) + pow(cos(y), 2)) -> nestedResult # x,y will be reset to 0
+  - max(x, y, z) - min(x, y, z) -> standardFuncResult    # x,y,z will be reset to 0
+  - sqrt(c*c + z*z) + round(pi()) -> complexResult       # c,z will be reset to 0
+  - step + 1 -> step                                     # step will be reset to 0

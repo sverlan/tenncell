@@ -1,0 +1,44 @@
+# FPGA example: UART commands toggle a single GPIO LED output.
+module:
+  name: fpga_uart_led
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  clock: clk
+  reset: rst
+  ports:
+    uart_rx:
+      direction: input
+      width: 1
+    led:
+      direction: output
+      width: 1
+  externals:
+    uart0:
+      header: uart.header.yaml
+      parameters:
+        CLOCK_FREQ: 50000000
+        BAUD_RATE: 115200
+      connections:
+        clk: clk
+        rst: rst
+        rx: uart_rx
+
+cells:
+  - id: 1
+    contents:
+      - uart_rx = 0
+      - led = 0
+      - rx_data = 0
+      - rx_valid = 0
+    input: [uart_rx]
+    output: [led]
+
+rules:
+  - rx_valid == 1 && rx_data == 1 | 1 -> led
+  - rx_valid == 1 && rx_data == 0 | 0 -> led

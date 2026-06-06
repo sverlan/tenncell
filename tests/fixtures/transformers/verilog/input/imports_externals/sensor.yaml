@@ -1,0 +1,21 @@
+module:
+  name: sensor
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 24
+    frac_bits: 8
+  ports:
+    level:
+      direction: output
+      width: 24
+      signed: true
+cells:
+  - id: 1
+    contents:
+      - level = 3
+    output: [level]
+rules: []

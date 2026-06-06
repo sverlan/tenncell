@@ -1,0 +1,21 @@
+ # Sensor module imported by the FPGA controller example.
+module:
+  name: sensor
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 24
+    frac_bits: 8
+
+cells:
+  - id: 1
+    contents:
+      - raw = 0
+      - level = 0
+    input: [raw]
+    output: [level]
+
+rules:
+  - raw + 2 -> level

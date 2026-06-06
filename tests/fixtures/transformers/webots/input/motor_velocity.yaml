@@ -1,0 +1,34 @@
+# Motor velocity Webots controller example.
+# Wheel position is initialized once before the control loop.
+module:
+  name: motor_velocity_controller
+cells:
+  - id: 1
+    contents:
+      - left_speed = 0
+      - right_speed = 0
+      - left_position = 0
+      - right_position = 0
+    output: [left_speed, right_speed]
+rules:
+  - True | 1 -> left_speed
+  - True | 2 -> right_speed
+webots:
+  controller_name: motor_velocity_controller
+  timestep: 64
+  bindings:
+    left_speed:
+      device: left wheel
+      write_method: setVelocity
+    right_speed:
+      device: right wheel
+      write_method: setVelocity
+    left_position:
+      device: left wheel
+      write_method: setPosition
+    right_position:
+      device: right wheel
+      write_method: setPosition
+  init:
+    left_position: inf
+    right_position: inf

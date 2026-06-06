@@ -1,0 +1,17 @@
+# Simulator IO-mode fixture used by CLI contract tests.
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+      - z = 0
+      - E = 0
+      - u = 1
+    input: [u]
+    output: [x, y, z]
+
+rules:
+  - E > x | x + 3 -> x
+  - E + 1 -> E
+  - 0 * z + x + y -> z
+  - (E > u || E > x || E > y) | u + x + y -> y

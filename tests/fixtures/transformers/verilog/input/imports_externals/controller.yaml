@@ -1,0 +1,48 @@
+module:
+  name: controller_top
+imports:
+  - module: sensor.yaml
+    as: sensor0
+aliases:
+  sensed: sensor0.level
+cells:
+  - id: 1
+    contents:
+      - alarm = 0
+      - uart_rx = 0
+      - uart_rx_data = 0
+      - uart_rx_valid = 0
+    input:
+      - uart_rx
+      - uart_rx_data
+      - uart_rx_valid
+    output:
+      - alarm
+rules:
+  - sensed > 1 && uart_rx_valid == 1 | uart_rx_data + 1 -> alarm
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    uart_rx:
+      direction: input
+      width: 1
+      signed: false
+    alarm:
+      direction: output
+      width: 32
+      signed: true
+  externals:
+    uart0:
+      header: uart.header.yaml
+      connections:
+        clk: clk
+        rst: rst
+        rx: uart_rx
+        rx_data: uart_rx_data
+        rx_valid: uart_rx_valid

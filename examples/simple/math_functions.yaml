@@ -1,0 +1,29 @@
+# Standalone example showing chained math functions in initializers and rules.
+name: "Math Functions Chain"
+description: "A standalone example for function calls, dependencies, and repeated stepping."
+
+cells:
+  - id: 1
+    contents:
+      - x = 2.0
+      - y = 3.0
+      - z = 4.0
+      - a = sin(x)
+      - b = pow(y, 2)
+      - c = a + b
+      - trigResult = 0.0
+      - powerResult = 0.0
+      - nestedResult = 0.0
+      - standardFuncResult = 0.0
+      - complexResult = 0.0
+      - step_count = 0.0
+    input: []
+    output: [step_count,x,y,z,a,b,c,trigResult,powerResult,nestedResult,standardFuncResult,complexResult]
+
+rules:
+  - sin(x) * cos(y) -> trigResult
+  - pow(a, b) -> powerResult
+  - sqrt(pow(sin(x), 2) + pow(cos(y), 2)) -> nestedResult
+  - max(x, y, z) - min(x, y, z) -> standardFuncResult
+  - sqrt(c * c + z * z) + round(pi()) -> complexResult
+  - step_count + 1 -> step_count

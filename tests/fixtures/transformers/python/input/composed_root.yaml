@@ -1,0 +1,16 @@
+module:
+  name: controller
+imports:
+  - module: composed_child.yaml
+    as: sensor0
+    connections:
+      raw: sample
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+rules:
+  - sensor0.level > 2 | sensor0.level -> alarm

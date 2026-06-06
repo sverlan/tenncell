@@ -1,0 +1,71 @@
+ # FPGA example: UART-driven controller composed with a sensor module.
+module:
+  name: sensor_controller
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  clock: clk
+  reset: rst
+  ports:
+    uart_rx:
+      direction: input
+      width: 1
+    uart_tx:
+      direction: output
+      width: 1
+  externals:
+    uart0:
+      header: uart.header.yaml
+      parameters:
+        BAUD_RATE: 9600
+      connections:
+        clk: clk
+        rst: rst
+        rx: uart_rx
+        rx_data: rx_data
+        rx_valid: rx_valid
+        tx_data: tx_data
+        tx_valid: tx_valid
+        tx: uart_tx
+
+constants:
+  THRESHOLD: 10
+
+imports:
+  - module: verilog_sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+
+aliases:
+  sensed: sensor0.level
+
+cells:
+  - id: 1
+    contents:
+      - uart_rx = 0
+      - uart_tx = 0
+      - tx_data = 0
+      - tx_valid = 0
+      - sample = 0
+      - sample_valid = 0
+      - rx_data = 0
+      - rx_valid = 0
+    input: [uart_rx]
+
+  - id: 2
+    contents:
+      - alarm = 0
+    output: [uart_tx]
+
+rules:
+  - rx_valid == 1 | rx_data -> sample
+  - rx_valid == 1 | 1 -> sample_valid
+  - sample_valid > 0 && sensed > THRESHOLD | 1 -> alarm
+  - alarm > 0 | alarm -> tx_data
+  - alarm > 0 | 1 -> tx_valid

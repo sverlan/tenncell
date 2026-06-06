@@ -1,0 +1,47 @@
+# Composed Python example: a controller module importing two sensor modules.
+module:
+  name: python_controller
+
+imports:
+  - module: verilog_composed_sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+  - module: verilog_composed_sensor_reset.yaml
+    as: sensor1
+    connections:
+      raw: sample
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+
+rules:
+  - sensor0.level > 2 | sensor0.level -> alarm
+  - sensor1.level > 5 | sensor1.level -> alarm
+  # reset alarm at each step, otherwise it might accumulate
+  - alarm * 0 -> alarm
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 8
+    frac_bits: 0
+  clock: clk
+  reset: rst
+  ports:
+    - name: sample
+      direction: input
+      kind: logic
+      width: 8
+      signed: false
+    - name: alarm
+      direction: output
+      kind: logic
+      width: 8
+      signed: false

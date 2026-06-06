@@ -1,0 +1,23 @@
+name: "Math Functions Test System"
+description: "Testing float computation"
+
+cells:
+  - id: 1
+    contents:
+      - t=4, a=pi()/4, v0=10
+      - vx = v0*cos(a), vy = v0*sin(a)
+      - z = 0, trash = 0
+    input: []
+    output: [t,vx,vy,z]
+  - id: 2
+    contents:
+      - t2 =2
+      - z = 1
+    output: [t2]
+
+rules:
+  - t + sqrt(t) -> t
+  - random() -> z
+  - z -> trash
+  
+  - pow(t2,1.2) -> t2

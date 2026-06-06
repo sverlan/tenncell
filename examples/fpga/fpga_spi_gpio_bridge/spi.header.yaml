@@ -1,0 +1,39 @@
+# External SPI-like interface header used by the GPIO bridge example.
+schema:
+  name: spi
+  parameters:
+    CLOCK_FREQ: 50000000
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: rst
+      direction: input
+      width: 1
+      signed: false
+    - name: sclk
+      direction: input
+      width: 1
+      signed: false
+    - name: cs
+      direction: input
+      width: 1
+      signed: false
+    - name: mosi
+      direction: input
+      width: 1
+      signed: false
+    - name: miso
+      direction: output
+      width: 1
+      signed: false
+    - name: data_out
+      direction: output
+      kind: logic
+      width: 8
+      signed: false
+    - name: data_valid
+      direction: output
+      width: 1
+      signed: false

@@ -1,0 +1,18 @@
+module:
+  name: root
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      trigger: toggle_pulse
+cells:
+  - id: 1
+    contents:
+      - toggle_pulse = 0
+rules: []

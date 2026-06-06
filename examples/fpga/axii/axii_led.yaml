@@ -1,0 +1,41 @@
+# FPGA example: AXII commands turn a GPIO LED on and off, and return its status via a response channel.
+module:
+  name: fpga_axii_led
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 1
+    frac_bits: 0
+  clock: clk
+  reset: rst
+  ports:
+    led:
+      direction: output
+      width: 1
+  externals:
+    axii0:
+      header: axii.header.yaml
+      connections:
+        clk: clk
+        rst: rst
+        resp_valid: resp_valid
+        resp_data: resp_data
+
+cells:
+  - id: 1
+    contents:
+      - led = 0
+      - cmd_valid = 0
+      - cmd_data = 0
+      - resp_valid = 0
+      - resp_data = 0
+    output: [led]
+
+rules:
+  - cmd_valid == 1 && cmd_data == 1 | 1 -> led
+  - cmd_valid == 1 && cmd_data == 0 | 0 -> led
+  - cmd_valid == 1 && cmd_data == 2 | 1 -> resp_valid
+  - cmd_valid == 1 && cmd_data == 2 | led -> resp_data

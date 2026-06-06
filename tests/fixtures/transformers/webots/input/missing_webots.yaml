@@ -1,0 +1,9 @@
+module:
+  name: missing_webots
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+rules:
+  - 1 -> x

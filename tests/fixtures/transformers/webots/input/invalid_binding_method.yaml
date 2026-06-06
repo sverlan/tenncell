@@ -1,0 +1,5 @@
+webots:
+  bindings:
+    led:
+      device: led
+      read_method: 1

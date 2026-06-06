@@ -1,0 +1,24 @@
+ # Imported Python sensor module used by the composed controller example.
+module:
+  name: python_sensor
+
+cells:
+  - id: 1
+    contents:
+      - raw = 0
+      - level = 0
+    input: [raw]
+    output: [level]
+
+rules:
+  - raw + 1 -> level
+  # reset level at each step, otherwise it accumulates
+  - level * 0 -> level 
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    # Changed in order to see the conversions
+    width: 12
+    frac_bits: 4

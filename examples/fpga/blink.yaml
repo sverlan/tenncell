@@ -1,0 +1,37 @@
+ # Tang Nano 20K LED blink example with active-low output.
+module:
+  name: fpga_blink
+  zero_reset_mode: true
+verilog:  
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 48
+    frac_bits: 10
+  clock: clk
+  reset: rst
+  ports:
+    - name: led
+      direction: output
+      kind: logic
+      width: 1
+      signed: false
+
+constants:
+  BLINK_DELAY: 27000000 
+
+cells:
+  - id: 1
+    contents:
+      - counter = 0
+      - led = 0
+    output: [led]
+
+rules:
+  # Count until the programmable delay expires.
+  - counter < BLINK_DELAY | counter + 1 -> counter
+  # Keep the LED state while the counter is still running.
+  - counter < BLINK_DELAY | led -> led
+  # When the delay expires, toggle the LED.
+  - counter >= BLINK_DELAY && led == 0 | 1 -> led
+  - counter >= BLINK_DELAY && led > 0 | 0 -> led

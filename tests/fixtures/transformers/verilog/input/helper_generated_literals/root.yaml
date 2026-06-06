@@ -1,0 +1,28 @@
+module:
+  name: root
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 40
+    frac_bits: 10
+  ports:
+    led:
+      direction: input
+      width: 1
+      signed: false
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      sig: led
+cells:
+  - id: 1
+    contents:
+      - led = 0
+      - x = 0
+    input:
+      - led
+rules: []

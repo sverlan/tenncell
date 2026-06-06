@@ -1,0 +1,121 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project]
+name = "tenncell"
+#version = "0.0.2"
+dynamic = ["version"]
+authors = [
+  { name="Sergey Verlan", email="dont-spam-me@no.spam" },
+]
+description = "Transformation and Execution of Numerical Networks of Cells"
+readme = "README.md"
+license = {text = "MIT"}
+
+dependencies = [
+    "lark~=1.1",
+    "PyYAML~=6.0",
+]
+
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+]
+
+[project.urls]
+Homepage = "https://github.com/sverlan/tenncell"
+Repository = "https://github.com/sverlan/tenncell"
+
+[project.scripts]
+nnc-sim = "nnc.__main__:main"
+nnc-gen = "nnc.cli_transform:main"
+[tool.pdm.version]
+#source = "file"
+#path = "src/nnc/_version.py"
+source = "scm"
+fallback_version = "0.0.0"
+tag_filter = "v*"
+tag_regex = '^v(.*)$'
+write_to = "nnc/_version.py"
+write_template = "__version__ = '{}'"
+
+[tool.pdm.scripts]
+test = "pytest --cov=nnc --cov-report=xml --cov-report=term-missing"
+builddoc = "sphinx-build -b html docs/source build/docs"
+lint = "ruff check --select F401,F841 src/nnc"
+format = "ruff format src tests/unit_tests tests/functional_tests tests/cli_tests"
+typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py"
+
+
+[tool.coverage.run]
+branch = true
+source = ["src/nnc/", "tests/"]
+omit = [
+ #   "nnc/tests/*",
+    "*/__main__.py",
+    "*/_version.py",
+    "venv/*",
+    "cli.py"
+    ]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+omit = [
+ #   "nnc/tests/*",
+    "*/__main__.py",
+    "*/_version.py",
+    "cli.py",
+    "venv/*",
+    ]
+# Regexes for lines to exclude from consideration
+# in addition to standard ones
+exclude_also = [
+    "if __name__ == .__main__.:",
+    ]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "def __repr__",
+    "def __str__",
+    "raise NotImplementedError",
+]
+
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
+[[tool.pdm.autoexport]]
+filename = "requirements.txt"
+without-hashes = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+pythonpath = ["src/"]
+# to do: ensure that unit tests cover all the code
+testpaths = ["tests/unit_tests/", "tests/functional_tests/", "tests/cli_tests/"]
+# testpaths = ["tests/unit_tests/"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.3",
+    "sphinx>=7.2.6",
+    "pytest-cov>=7.0.0",
+    "sphinx-rtd-theme>=3.0.2",
+    "ruff>=0.6.0",
+    "mypy>=1.11.2",
+]

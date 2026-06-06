@@ -1,0 +1,32 @@
+module:
+  name: ballistic
+  description: "Example for ballistic motion"
+  
+constants:
+  g: 9.81
+  dt: 0.05
+  v0: 10 
+  # angle: 45 deg
+  deg: pi()/4
+cells:
+  - id: 1
+    contents:
+      - x=0, y=0 
+      - vx = v0*cos(deg), vy=v0*sin(deg)
+    input: []
+    output: [x,y]
+
+rules:
+    # speed
+    - y + (vy -g*dt)*dt >=0 | vx -> vx
+    - y + (vy -g*dt)*dt >=0 | vy - g*dt -> vy
+    # Position
+    - 0 * x -> x
+    - 0 * y -> y
+    - y + (vy -g*dt)*dt >=0 | x + vx * dt -> x
+    - y + (vy -g*dt)*dt >=0 | y + vy * dt -> y
+    # ground detection
+    -  (! (y + (vy -g*dt)*dt >=0)) | 0 -> vx
+    - (! (y + (vy -g*dt)*dt >=0)) | 0 -> vy
+    - (! (y + (vy -g*dt)*dt >=0)) | y -> y    
+    - (! (y + (vy -g*dt)*dt >=0)) | x -> x

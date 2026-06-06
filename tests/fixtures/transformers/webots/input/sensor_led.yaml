@@ -1,0 +1,23 @@
+# Sensor-led Webots controller example.
+# A distance sensor controls a simple LED output.
+module:
+  name: sensor_led_controller
+cells:
+  - id: 1
+    contents:
+      - input_x = 0
+      - out = 0
+    input: [input_x]
+    output: [out]
+rules:
+  - input_x + 1 -> out
+webots:
+  controller_name: sensor_led_controller
+  timestep: 32
+  bindings:
+    input_x:
+      device: distance_sensor
+      read_method: getValue
+    out:
+      device: led
+      write_method: setValue

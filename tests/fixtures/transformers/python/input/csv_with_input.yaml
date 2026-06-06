@@ -1,0 +1,11 @@
+module:
+  name: csv_with_input_demo
+cells:
+  - id: 1
+    contents:
+      - input_x = 0
+      - out = 0
+    input: [input_x]
+    output: [out]
+rules:
+  - input_x + 1 -> out

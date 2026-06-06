@@ -1,0 +1,16 @@
+module:
+  name: missing_output_binding
+cells:
+  - id: 1
+    contents:
+      - input_x = 0
+      - out = 0
+    input: [input_x]
+    output: [out]
+rules:
+  - input_x + 1 -> out
+webots:
+  bindings:
+    input_x:
+      device: sensor
+      read_method: getValue

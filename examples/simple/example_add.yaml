@@ -1,0 +1,23 @@
+ # Simple addition example that accumulates values into a single output.
+cells:
+  - id: 1
+    contents:
+      - d=0 ,  a=0,b=0,c=0
+      #- x = 0, y = 4, E = 3, z = 4, u = 0
+    input: [a,b]
+    output: [c]
+
+  - id: 2
+    contents:
+      - d=0, x=0 #, c=0
+    input: [x]
+    output: []
+
+rules:
+#  - x + 1 -> c
+  - a + b -> c
+# Reset c at each step
+  - 0 * c -> c
+
+
+

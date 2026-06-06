@@ -1,0 +1,6 @@
+module:
+  name: no_outputs_demo
+cells:
+  - id: 1
+    contents:
+      - x = 0

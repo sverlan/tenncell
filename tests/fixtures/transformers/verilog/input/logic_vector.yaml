@@ -1,0 +1,21 @@
+module:
+  name: logic_vector_demo
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 40
+    frac_bits: 10
+  ports:
+    leds:
+      direction: output
+      width: 6
+      signed: false
+cells:
+  - id: 1
+    contents:
+      - leds = 62
+    output: [leds]
+rules: []

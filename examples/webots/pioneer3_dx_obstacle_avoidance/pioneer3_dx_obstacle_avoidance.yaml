@@ -1,0 +1,116 @@
+# Pioneer 3-DX obstacle avoidance controller example.
+# Uses a small sonar cluster to steer away from obstacles while moving forward.
+module:
+  name: pioneer3_dx_obstacle_avoidance_controller
+  zero_reset_mode: true
+
+constants:
+  BASE_SPEED: 1.8
+  TURN_GAIN: 3.0
+  FRONT_GAIN: 2.0
+  SENSOR_MAX: 1000.0
+  OBSTACLE_THRESHOLD: 0.85
+  SIDE_THRESHOLD: 0.35
+  BACK_SPEED: 1.5
+  MAX_SPEED: 12.3
+
+cells:
+  - id: 1
+    contents:
+      - left_sensor = 0
+      - front_left_sensor = 0
+      - front_sensor = 0
+      - front_right_sensor = 0
+      - right_sensor = 0
+      - left_cluster = 0
+      - front_cluster = 0
+      - right_cluster = 0
+      - left_sensor_norm = 0
+      - front_left_sensor_norm = 0
+      - front_sensor_norm = 0
+      - front_right_sensor_norm = 0
+      - right_sensor_norm = 0
+      - turn = 0
+      - left_speed_raw = 0
+      - right_speed_raw = 0
+      - left_speed = 0
+      - right_speed = 0
+      - left_position = 0
+      - right_position = 0
+    input: [left_sensor, front_left_sensor, front_sensor, front_right_sensor, right_sensor]
+    output: [left_speed, right_speed]
+
+rules:
+  - left_sensor / SENSOR_MAX -> left_sensor_norm
+  - front_left_sensor / SENSOR_MAX -> front_left_sensor_norm
+  - front_sensor / SENSOR_MAX -> front_sensor_norm
+  - front_right_sensor / SENSOR_MAX -> front_right_sensor_norm
+  - right_sensor / SENSOR_MAX -> right_sensor_norm
+  - (left_sensor_norm * 2 + front_left_sensor_norm * 3 + front_sensor_norm * 2) / 7 -> left_cluster
+  - (front_left_sensor_norm + front_sensor_norm * 3 + front_right_sensor_norm) / 5 -> front_cluster
+  - (front_sensor_norm * 2 + front_right_sensor_norm * 3 + right_sensor_norm * 2) / 7 -> right_cluster
+  - (right_cluster - left_cluster) * TURN_GAIN -> turn
+  - if: front_cluster > OBSTACLE_THRESHOLD
+    then:
+      - -BACK_SPEED + turn -> left_speed_raw
+      - -BACK_SPEED - turn -> right_speed_raw
+    else:
+      - if: left_cluster > SIDE_THRESHOLD
+        then:
+          - BASE_SPEED + turn -> left_speed_raw
+          - BASE_SPEED - turn -> right_speed_raw
+        else:
+          - if: right_cluster > SIDE_THRESHOLD
+            then:
+              - BASE_SPEED - turn -> left_speed_raw
+              - BASE_SPEED + turn -> right_speed_raw
+            else:
+              - BASE_SPEED - front_cluster * FRONT_GAIN - turn -> left_speed_raw
+              - BASE_SPEED - front_cluster * FRONT_GAIN + turn -> right_speed_raw
+  - if: left_speed_raw > MAX_SPEED
+    then: MAX_SPEED -> left_speed
+    else:
+      - if: left_speed_raw < -MAX_SPEED
+        then: -MAX_SPEED -> left_speed
+        else: left_speed_raw -> left_speed
+  - if: right_speed_raw > MAX_SPEED
+    then: MAX_SPEED -> right_speed
+    else:
+      - if: right_speed_raw < -MAX_SPEED
+        then: -MAX_SPEED -> right_speed
+        else: right_speed_raw -> right_speed
+
+webots:
+  controller_name: pioneer3_dx_obstacle_avoidance_controller
+  timestep: 64
+  bindings:
+    left_sensor:
+      device: so0
+      read_method: getValue
+    front_left_sensor:
+      device: so1
+      read_method: getValue
+    front_sensor:
+      device: so2
+      read_method: getValue
+    front_right_sensor:
+      device: so3
+      read_method: getValue
+    right_sensor:
+      device: so4
+      read_method: getValue
+    left_speed:
+      device: left wheel
+      write_method: setVelocity
+    right_speed:
+      device: right wheel
+      write_method: setVelocity
+    left_position:
+      device: left wheel
+      write_method: setPosition
+    right_position:
+      device: right wheel
+      write_method: setPosition
+  init:
+    left_position: inf
+    right_position: inf

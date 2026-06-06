@@ -1,0 +1,47 @@
+# FSM example with nested if/else branches inside state rules.
+module:
+  name: fsm_with_ifs_demo
+  zero_reset_mode: true
+
+constants:
+  HIGH_THRESHOLD: 10
+
+cells:
+  - id: 1
+    contents:
+      - state = 0
+      - x = 0
+      - y = 0
+      - z = 0
+    input: [x]
+    output: [y, z]
+
+fsm:
+  - name: control
+    variable: state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: x > 2
+              then:
+                - RUN -> state
+                - y * 0 -> y
+                - z * 0 -> z
+              else:
+                - y * 0 -> y
+                - z * 0 -> z
+      - RUN:
+          rules:
+            - if: x > HIGH_THRESHOLD
+              then:
+                - if: x > 20
+                  then:
+                    - 2 -> y
+                    - 2 -> z
+                  else:
+                    - 1 -> y
+                    - 1 -> z
+              else:
+                - 0 -> y
+                - 0 -> z

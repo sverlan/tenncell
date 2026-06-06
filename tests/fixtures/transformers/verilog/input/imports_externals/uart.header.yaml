@@ -1,0 +1,24 @@
+schema:
+  module: uart
+  parameters: {}
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: rst
+      direction: input
+      width: 1
+      signed: false
+    - name: rx
+      direction: input
+      width: 1
+      signed: false
+    - name: rx_data
+      direction: output
+      width: 8
+      signed: false
+    - name: rx_valid
+      direction: output
+      width: 1
+      signed: false

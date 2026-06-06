@@ -1,0 +1,12 @@
+module:
+  name: zero_reset_demo
+  zero_reset_mode: true
+cells:
+  - id: 1
+    contents:
+      - trigger = 0
+      - out = 0
+    input: [trigger]
+    output: [out]
+rules:
+  - trigger + 1 -> out

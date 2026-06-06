@@ -1,0 +1,17 @@
+# Standalone example showing zero-reset behavior and output propagation.
+module:
+  name: zero_reset_and_outputs
+  zero_reset_mode: true
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+      - z = 0
+    input: [x]
+    output: [y, z]
+
+rules:
+  - x + 1 -> y
+  - y + x -> z

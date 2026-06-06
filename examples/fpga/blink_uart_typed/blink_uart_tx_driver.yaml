@@ -1,0 +1,58 @@
+# Helper module for the typed blink-uart FPGA example.
+module:
+  name: blink_uart_tx_driver
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 8
+    frac_bits: 0
+  ports:
+    trigger:
+      direction: input
+      kind: logic
+      width: 1
+      signed: false
+    led_state:
+      direction: input
+      kind: logic
+      width: 1
+      signed: false
+    uart_ready:
+      direction: input
+      kind: logic
+      width: 1
+      signed: false
+    tx_data:
+      direction: output
+      kind: logic
+      width: 8
+      signed: false
+    tx_valid:
+      direction: output
+      kind: logic
+      width: 1
+      signed: false
+
+constants:
+  LED_OFF_BYTE: 48
+  LED_ON_BYTE: 49
+
+cells:
+  - id: 1
+    contents:
+      - trigger = 0
+      - led_state = 0
+      - uart_ready = 0
+      - tx_data = 0
+      - tx_valid = 0
+    input: [trigger, led_state, uart_ready]
+    output: [tx_data, tx_valid]
+
+rules:
+  # Emit ASCII '0' or '1' when a blink toggle occurs and the UART can accept data.
+  - trigger > 0 && uart_ready > 0 && led_state == 0 | LED_OFF_BYTE -> tx_data
+  - trigger > 0 && uart_ready > 0 && led_state > 0 | LED_ON_BYTE -> tx_data
+  - trigger > 0 && uart_ready > 0 | 1 -> tx_valid

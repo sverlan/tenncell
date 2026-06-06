@@ -1,0 +1,27 @@
+cells:
+  - id: 1
+    contents:
+      - E = 0
+      - d1 = 0, d2 = 0, d3 = 0
+      - name: var1
+        value: 5
+      - name: d2
+        value: 3
+rules:
+  - E + 1 -> E
+  # All operations
+  - d1 > d2 && ! d2 < d3 || d1 >=d3 && (d2 <= d3 && d1 == d2 || d3 != d1) || true && false | d1*2 + 1 - -d2/4 -> d1
+  # guard form
+  - guard: d1 > d2
+    producer: d1 + 2 * d3
+    consumer: d2
+  # no guard
+  - producer: d1 + 2 * d3
+    consumer: d2
+  # true guard
+  - guard: False
+    producer: d1 + 2 * d3
+    consumer: d2
+  # not at the beginning - should hide ! sign
+  - (! d1 > d2)   | d1 -> d1
+

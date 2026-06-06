@@ -1,0 +1,24 @@
+ # Recursive if/else example for FSM lowering and runtime stepping.
+module:
+  name: if_recursive_demo
+  zero_reset_mode: true
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+      - z = 0
+    input: [x]
+    output: [y, z]
+
+rules:
+  - if: x > 2
+    then:
+      - 1 -> y
+      - if: x > 10
+        then: 2 -> z
+        else: 1 -> z
+    else:
+      - 0 -> y
+      - 0 -> z

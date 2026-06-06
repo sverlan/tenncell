@@ -1,0 +1,47 @@
+ # Tang Nano 20K LED walker example with active-low outputs.
+module:
+  name: fpga_ledwalk
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 30
+    frac_bits: 0
+  clock: clk
+  reset: rst
+  ports:
+    leds:
+      direction: output
+      width: 6
+
+constants:
+  STEP_DELAY: 27000000
+
+cells:
+  - id: 1
+    contents:
+      - counter = 0
+      - leds = 62
+    output: [leds]
+
+rules:
+  # Tang Nano 20K LEDs are active-low: output 0 turns an LED ON.
+  # Keep counting until the walking-step delay expires.
+  - counter < STEP_DELAY | counter + 1 -> counter
+  # Preserve current LED pattern while counting.
+  - counter < STEP_DELAY | leds -> leds
+
+  # Advance a walking-zero LED pattern each step window.
+  - counter >= STEP_DELAY && leds == 62 | 61 -> leds
+  - counter >= STEP_DELAY && leds == 61 | 59 -> leds
+  - counter >= STEP_DELAY && leds == 59 | 55 -> leds
+  - counter >= STEP_DELAY && leds == 55 | 47 -> leds
+  - counter >= STEP_DELAY && leds == 47 | 31 -> leds
+  - counter >= STEP_DELAY && leds == 31 | 62 -> leds
+
+  # Recover if all LEDs are off.
+  - counter >= STEP_DELAY && leds == 63 | 62 -> leds
+
+

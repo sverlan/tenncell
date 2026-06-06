@@ -1,0 +1,21 @@
+module:
+  name: inferred_ports_demo
+  zero_reset_mode: true
+
+cells:
+  - id: 1
+    contents:
+      - sensor = 0
+      - led = 0
+    input: [sensor]
+    output: [led]
+
+rules:
+  - sensor > 0 | 1 -> led
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 8
+    frac_bits: 0

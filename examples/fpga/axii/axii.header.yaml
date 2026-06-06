@@ -1,0 +1,30 @@
+# External AXII interface header used by the AXII LED example.
+schema:
+  name: axii
+  parameters:
+    CLOCK_FREQ: 50000000
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: rst
+      direction: input
+      width: 1
+      signed: false
+    - name: cmd_valid
+      direction: output
+      width: 1
+      signed: false
+    - name: cmd_data
+      direction: output
+      width: 2
+      signed: false
+    - name: resp_valid
+      direction: input
+      width: 1
+      signed: false
+    - name: resp_data
+      direction: input
+      width: 1
+      signed: false

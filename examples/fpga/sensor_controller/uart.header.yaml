@@ -1,0 +1,41 @@
+ # External UART interface header used by FPGA examples.
+schema:
+  name: uart
+  parameters:
+    CLOCK_FREQ: 50000000
+    BAUD_RATE: 115200
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: rst
+      direction: input
+      width: 1
+      signed: false
+    - name: rx
+      direction: input
+      width: 1
+      signed: false
+    - name: tx
+      direction: output
+      width: 1
+      signed: false
+    - name: tx_data
+      direction: input
+      kind: logic
+      width: 8
+      signed: false
+    - name: tx_valid
+      direction: input
+      width: 1
+      signed: false
+    - name: rx_data
+      direction: output
+      kind: logic
+      width: 8
+      signed: false
+    - name: rx_valid
+      direction: output
+      width: 1
+      signed: false

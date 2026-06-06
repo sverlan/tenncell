@@ -1,0 +1,27 @@
+# Composed Python example: a controller module importing two sensor modules.
+module:
+  name: python_controller
+
+imports:
+  - module: python_composed_sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+  - module: python_composed_sensor_reset.yaml
+    as: sensor1
+    connections:
+      raw: sample
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+
+rules:
+  - sensor0.level > 2 | sensor0.level -> alarm
+  - sensor1.level > 5 | sensor1.level -> alarm
+  # reset alarm at each step, otherwise it might accumulate
+  - alarm * 0 -> alarm

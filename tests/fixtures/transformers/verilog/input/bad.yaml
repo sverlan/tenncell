@@ -1,0 +1,7 @@
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+rules:
+  - sin(x) -> y

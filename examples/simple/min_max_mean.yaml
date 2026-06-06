@@ -1,0 +1,29 @@
+cells:
+  - description: "Example for a minium/maximum/mean value"
+    id: 1
+    contents:
+      - a=10, b=5,c=0
+      - min=0,max=0,mean=0
+    input: []
+    output: [a,b,c,min,max,mean]
+rules:
+
+  - a >= b && a >= c | a -> max
+  - b > a && b >= c | b -> max
+  - c > a && c > b | c -> max
+  - a <= b && a <= c | a -> min
+  - b < a && b <= c | b -> min
+  - c < a && c < b | c -> min
+
+  - a +1 -> a
+  - b + 2 -> b
+  - c + 4 -> c
+    # a,b,c
+    # 1,4,4
+    # 4,1,4
+    # 4,4,1
+
+  - (a + b + c) / 3 -> mean
+  - 0 * mean -> mean
+  - 0 * min -> min
+  - 0 * max -> max

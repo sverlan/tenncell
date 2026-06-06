@@ -1,0 +1,58 @@
+# FPGA example: SPI-like external commands drive a GPIO LED output.
+module:
+  name: fpga_spi_gpio_bridge
+  zero_reset_mode: true
+
+verilog:
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  clock: clk
+  reset: rst
+  ports:
+    spi_sclk:
+      direction: input
+      width: 1
+    spi_cs:
+      direction: input
+      width: 1
+    spi_mosi:
+      direction: input
+      width: 1
+    spi_miso:
+      direction: output
+      width: 1
+    gpio_led:
+      direction: output
+      width: 1
+  externals:
+    spi0:
+      header: spi.header.yaml
+      parameters:
+        CLOCK_FREQ: 50000000
+      connections:
+        clk: clk
+        rst: rst
+        sclk: spi_sclk
+        cs: spi_cs
+        mosi: spi_mosi
+        miso: spi_miso
+
+cells:
+  - id: 1
+    contents:
+      - spi_sclk = 0
+      - spi_cs = 0
+      - spi_mosi = 0
+      - spi_miso = 0
+      - gpio_led = 0
+      - data_out = 0
+      - data_valid = 0
+    input: [spi_sclk, spi_cs, spi_mosi]
+    output: [spi_miso, gpio_led]
+
+rules:
+  - data_valid == 1 && data_out == 1 | 1 -> gpio_led
+  - data_valid == 1 && data_out == 0 | 0 -> gpio_led

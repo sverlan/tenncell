@@ -1,0 +1,10 @@
+module:
+  name: csv_without_input_demo
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - out = 0
+    output: [out]
+rules:
+  - x + 1 -> out

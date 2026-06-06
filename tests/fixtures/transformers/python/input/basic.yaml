@@ -1,0 +1,9 @@
+module:
+  name: basic_demo
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+rules:
+  - x + 1 -> y

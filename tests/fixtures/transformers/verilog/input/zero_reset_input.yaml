@@ -1,0 +1,29 @@
+module:
+  name: zero_reset_input_demo
+  zero_reset_mode: true
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    trigger:
+      direction: input
+      width: 32
+      signed: true
+    out:
+      direction: output
+      width: 32
+      signed: true
+cells:
+  - id: 1
+    contents:
+      - trigger = 0
+      - out = 0
+    input: [trigger]
+    output: [out]
+rules:
+  - 1 -> out

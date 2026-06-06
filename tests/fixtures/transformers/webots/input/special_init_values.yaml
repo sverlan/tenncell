@@ -1,0 +1,8 @@
+webots:
+  bindings:
+    left_position:
+      device: left wheel
+      write_method: setPosition
+  init:
+    left_position: inf
+    right_position: nan

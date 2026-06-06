@@ -1,0 +1,30 @@
+module:
+  name: top_io_demo
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    sample:
+      direction: input
+      kind: logic
+      width: 8
+      signed: false
+    alarm:
+      direction: output
+      kind: logic
+      width: 8
+      signed: false
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+rules:
+  - sample + 1.5 -> alarm

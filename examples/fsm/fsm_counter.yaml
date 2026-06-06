@@ -1,0 +1,51 @@
+ # FSM example: a counter with explicit state transitions.
+module:
+  name: fsm_counter_demo
+
+constants:
+  MAX_COUNT: 3
+
+cells:
+  - id: 1
+    contents:
+      - ctrl_state = 0
+      - counter = 0
+      - start = 0
+      - done = 0
+    input: [start]
+    output: [counter, done]
+
+fsm:
+  - name: ctrl
+    variable: ctrl_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: start > 0
+              then:
+                - RUN -> ctrl_state
+                - counter * 0 -> counter
+                - done * 0 -> done
+              else:
+                - done * 0 -> done
+      - RUN:
+          rules:
+            - if: counter >= MAX_COUNT
+              then:
+                - DONE -> ctrl_state
+                - 1 -> done
+              else:
+                - counter + 1 -> counter
+      - DONE:
+          rules:
+            - done -> done
+
+#Example of input CSV
+#start
+#0
+#0
+#1
+#0
+#1
+#0

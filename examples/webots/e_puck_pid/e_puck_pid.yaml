@@ -1,0 +1,52 @@
+# e-puck controller example.
+# Simple proportional control driven by left and right proximity sensors.
+module:
+  name: e_puck_pid_controller
+
+constants:
+  BASE_SPEED: 2.0
+  KP: 0.5
+
+cells:
+  - id: 1
+    contents:
+      - left_sensor = 0
+      - right_sensor = 0
+      - sensor_error = 0
+      - left_speed = 0
+      - right_speed = 0
+      - left_position = 0
+      - right_position = 0
+    input: [left_sensor, right_sensor]
+    output: [left_speed, right_speed]
+
+rules:
+  - True | (right_sensor - left_sensor) * KP -> sensor_error
+  - True | BASE_SPEED - sensor_error -> left_speed
+  - True | BASE_SPEED + sensor_error -> right_speed
+
+webots:
+  controller_name: e_puck_pid_controller
+  timestep: 64
+  bindings:
+    left_sensor:
+      device: ps0
+      read_method: getValue
+    right_sensor:
+      device: ps7
+      read_method: getValue
+    left_speed:
+      device: left wheel motor
+      write_method: setVelocity
+    right_speed:
+      device: right wheel motor
+      write_method: setVelocity
+    left_position:
+      device: left wheel motor
+      write_method: setPosition
+    right_position:
+      device: right wheel motor
+      write_method: setPosition
+  init:
+    left_position: inf
+    right_position: inf

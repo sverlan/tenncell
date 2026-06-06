@@ -1,0 +1,25 @@
+module:
+  name: unsigned_fixed_demo
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: false
+    width: 16
+    frac_bits: 8
+  ports:
+    y:
+      direction: output
+      width: 16
+      signed: false
+constants:
+  SCALE: 1
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - y = 0
+    output: [y]
+rules:
+  - x + SCALE + 1.5 -> y

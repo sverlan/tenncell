@@ -1,0 +1,36 @@
+ # External UART transmitter header used by FPGA examples.
+schema:
+  name: uart_tx
+  parameters:
+    CLOCK_HZ: 27000000
+    BAUD_RATE: 115200
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: rst
+      direction: input
+      width: 1
+      signed: false
+    - name: data_in
+      direction: input
+      kind: logic
+      width: 8
+      signed: false
+    - name: valid
+      direction: input
+      width: 1
+      signed: false
+    - name: ready
+      direction: output
+      width: 1
+      signed: false
+    - name: tx
+      direction: output
+      width: 1
+      signed: false
+    - name: busy
+      direction: output
+      width: 1
+      signed: false
