@@ -1,0 +1,10 @@
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - x = 1
+      - y = 0
+  - id: 2
+    contents:
+      - y = 1
+rules: []

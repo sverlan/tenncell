@@ -1,5 +1,7 @@
 """Shared TENNCell YAML lowering helpers."""
 
+from collections.abc import Iterable
+
 from ....parser import parse_condition, parse_expression
 from ....parser.ast import (
     BooleanAndExpression,
@@ -11,6 +13,25 @@ from ....parser.ast import (
 from ....parser.ast.value import FloatValue
 from ....parser.ast.variable import Variable
 from ....model.rule import Rule
+
+
+def register_initial_declarations(
+    initial_declarations: dict[str, tuple[int, int]],
+    variable_names: Iterable[str],
+    cell_index: int,
+    content_index: int,
+) -> None:
+    """Reject duplicate module-level variable initializers."""
+    for variable_name in variable_names:
+        first_location = initial_declarations.get(variable_name)
+        if first_location is not None:
+            first_cell_index, first_content_index = first_location
+            raise ValueError(
+                f"Duplicate initial declaration for variable '{variable_name}' "
+                f"first declared at cells[{first_cell_index}].contents"
+                f"[{first_content_index}]"
+            )
+        initial_declarations[variable_name] = (cell_index, content_index)
 
 
 def normalize_rule_items(raw_items) -> list:

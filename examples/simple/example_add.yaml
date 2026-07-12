@@ -9,7 +9,7 @@ cells:
 
   - id: 2
     contents:
-      - d=0, x=0 #, c=0
+      - x=0 #, c=0
     input: [x]
     output: []
 

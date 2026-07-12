@@ -19,7 +19,6 @@ cells:
       - standardFuncResult = 0.0
       - complexResult = 0.0
       - step = 0.0
-      - z1 = 2.0
       - z1 = 3.0
 rules:
   # Variables used in these rules (x,y,z,a,b,c) will be reset to 0 after rule execution

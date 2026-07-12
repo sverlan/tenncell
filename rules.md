@@ -29,6 +29,9 @@
   - `fsm`
 - `cells` remains top-level for backward compatibility.
 - `cells[].id` must be numeric.
+- Variable names are module-level, not cell-local.
+- A variable may be initialized only once in `cells[].contents`.
+- Duplicate initial declarations in the same cell or across cells are rejected during YAML loading.
 
 ## Module Defaults
 - If `module.name` is absent, the generated module name defaults to the source filename stem.

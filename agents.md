@@ -13,6 +13,7 @@
 - Internal helpers should have short factual docstrings; full public-style docs are not required.
 - Unit tests must correspond to written contracts, not implementation details.
 - Functional tests must correspond to scenario contracts and use dedicated fixtures under `tests/fixtures/`.
+- Minimize generated YAML inside tests; prefer checked-in fixture files for scenario contracts and inline YAML only for small focused unit cases.
 - CLI tests should stay separate from unit and functional tests.
 - Coverage-only tests belong in `tests/coverage_tests/` and should not be mixed with contract tests.
 

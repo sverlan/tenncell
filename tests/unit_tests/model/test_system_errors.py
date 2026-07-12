@@ -77,6 +77,24 @@ class TestSystemErrors:
         with pytest.raises(ValueError, match="Cell id must be an integer"):
             NncSystem.from_yaml(str(system_file))
 
+    def test_yaml_loader_duplicate_initial_declaration_raises(self):
+        system_file = (
+            Path(__file__).resolve().parents[2]
+            / "fixtures"
+            / "model"
+            / "errors"
+            / "duplicate_initial_same_cell.yaml"
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                rf"{re.escape(str(system_file))}:5: "
+                "Duplicate initial declaration for variable 'x'"
+            ),
+        ):
+            NncSystem.from_yaml(str(system_file))
+
     def test_yaml_assignment_error_is_wrapped(self, tmp_path):
         system_file = tmp_path / "bad_assignment.yaml"
         write_text(

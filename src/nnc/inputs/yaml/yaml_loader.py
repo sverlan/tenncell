@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ...model.cell import Cell
 from ...parser import parse_variable_assignment
@@ -9,7 +9,12 @@ from ...parser.ast.value import FloatValue
 from ...parser.ast.variable import Variable
 from .errors import as_yaml_located_error
 from .locations import load_yaml_data_and_locations
-from .lowering import build_state_constants, lower_fsm_rules, lower_rule_items
+from .lowering import (
+    build_state_constants,
+    lower_fsm_rules,
+    lower_rule_items,
+    register_initial_declarations,
+)
 from .module_config import ImportConfig
 from .parsing import parse_constants, parse_module_config
 from .raw_model import RawYamlDocument
@@ -72,6 +77,8 @@ def _build_system_from_raw_document(
         )
 
     variables: dict[str, Variable] = {}
+    initial_declarations: dict[str, tuple[int, int]] = {}
+
     for cell_index, cell_data in enumerate(raw_document.cells):
         cell_id = cell_data.get("id")
         if not isinstance(cell_id, int):
@@ -80,19 +87,47 @@ def _build_system_from_raw_document(
         for content_index, variable_data in enumerate(cell_data.get("contents", [])):
             if isinstance(variable_data, dict) and "name" in variable_data:
                 variable_name = variable_data.get("name")
+                if not isinstance(variable_name, str):
+                    raise raw_document.locations.error(
+                        "Variable name must be a string",
+                        "cells",
+                        cell_index,
+                        "contents",
+                        content_index,
+                    )
                 variable_value = variable_data.get("value")
+                if not isinstance(variable_value, int | float | str):
+                    raise raw_document.locations.error(
+                        "Variable value must be a number or string",
+                        "cells",
+                        cell_index,
+                        "contents",
+                        content_index,
+                    )
                 variable = variables.get(
                     variable_name, Variable(variable_name, FloatValue(variable_value))
                 )
+                try:
+                    register_initial_declarations(
+                        initial_declarations,
+                        [variable_name],
+                        cell_index,
+                        content_index,
+                    )
+                except ValueError as e:
+                    raise raw_document.locations.error(
+                        str(e), "cells", cell_index, "contents", content_index
+                    ) from e
                 variables[variable_name] = variable
                 contents[variable_name] = variable
             else:
                 try:
-                    parsed_variables = parse_variable_assignment(
-                        variable_data, variables, nnc.constants, nnc.aliases
+                    parsed_variables = cast(
+                        dict[str, Variable],
+                        parse_variable_assignment(
+                            variable_data, variables, nnc.constants, nnc.aliases
+                        ),
                     )
-                    contents.update(parsed_variables)
-                    variables.update(parsed_variables)
                 except Exception as e:
                     raise as_yaml_located_error(
                         raw_document.locations.error(
@@ -103,6 +138,19 @@ def _build_system_from_raw_document(
                             content_index,
                         )
                     )
+                try:
+                    register_initial_declarations(
+                        initial_declarations,
+                        parsed_variables,
+                        cell_index,
+                        content_index,
+                    )
+                except ValueError as e:
+                    raise raw_document.locations.error(
+                        str(e), "cells", cell_index, "contents", content_index
+                    ) from e
+                contents.update(parsed_variables)
+                variables.update(parsed_variables)
         cell = Cell(cell_id, contents)
         nnc.add_cell(cell)
 

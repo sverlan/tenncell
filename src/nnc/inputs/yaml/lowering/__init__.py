@@ -6,6 +6,7 @@ from .common import (
     make_transition_rule,
     normalize_rule_items,
     parse_structured_rule,
+    register_initial_declarations,
     with_guard,
 )
 from .fsm import build_state_constants, lower_fsm_rules
@@ -20,5 +21,6 @@ __all__ = [
     "make_transition_rule",
     "normalize_rule_items",
     "parse_structured_rule",
+    "register_initial_declarations",
     "with_guard",
 ]

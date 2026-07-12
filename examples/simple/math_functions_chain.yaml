@@ -12,7 +12,6 @@ cells:
   - id: 2
     contents:
       - t2 =2
-      - z = 1
     output: [t2]
 
 rules:

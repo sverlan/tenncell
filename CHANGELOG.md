@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Rejected duplicate YAML initial declarations in `cells[].contents`, including same-cell redeclarations and cross-cell redeclarations.
+- Documented YAML test fixture preferences for future agent work.
+
 ## 0.7.0
 
 - First public release
