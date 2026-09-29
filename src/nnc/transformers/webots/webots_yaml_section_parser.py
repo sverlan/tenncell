@@ -140,11 +140,20 @@ def _parse_csv(raw_csv: object, context: YamlSectionContext) -> WebotsCsvConfig 
             context.locations.line_for("webots", "csv", "include_time"),
         )
 
+    include_initial = raw_csv.get("include_initial", False)
+    if not isinstance(include_initial, bool):
+        raise YamlLocatedError(
+            "webots.csv.include_initial must be a boolean if provided",
+            context.source_path,
+            context.locations.line_for("webots", "csv", "include_initial"),
+        )
+
     return WebotsCsvConfig(
         file=file,
         variables=variables,
         include_step=include_step,
         include_time=include_time,
+        include_initial=include_initial,
     )
 
 

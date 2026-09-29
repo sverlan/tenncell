@@ -15,12 +15,15 @@ class WebotsCsvConfig:
         include_step: Whether to prepend a generated ``_step`` column.
         include_time: Whether to prepend a generated ``_time`` column using
             ``robot.getTime()``.
+        include_initial: Whether to write the initial variable snapshot before
+            the Webots controller loop.
     """
 
     file: str
     variables: list[str]
     include_step: bool = False
     include_time: bool = False
+    include_initial: bool = False
 
 
 @dataclass(slots=True)

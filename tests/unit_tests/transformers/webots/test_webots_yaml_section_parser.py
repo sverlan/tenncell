@@ -100,6 +100,16 @@ def test_parse_webots_section_parses_csv_logging():
     assert config.csv.variables == ["input_x", "out"]
     assert config.csv.include_step is True
     assert config.csv.include_time is True
+    assert config.csv.include_initial is False
+
+
+def test_parse_webots_section_parses_initial_csv_logging():
+    path = _fixture_path("sensor_led_csv_initial.yaml")
+    context = _context(path)
+    config = parse_webots_section(context.raw_data["webots"], context)
+
+    assert config.csv is not None
+    assert config.csv.include_initial is True
 
 
 @pytest.mark.parametrize(
@@ -110,6 +120,7 @@ def test_parse_webots_section_parses_csv_logging():
         ("invalid_csv_variables.yaml", r"invalid_csv_variables\.yaml:4: webots\.csv\.variables must be a list of strings"),
         ("invalid_csv_include_step.yaml", r"invalid_csv_include_step\.yaml:5: webots\.csv\.include_step must be a boolean if provided"),
         ("invalid_csv_include_time.yaml", r"invalid_csv_include_time\.yaml:5: webots\.csv\.include_time must be a boolean if provided"),
+        ("invalid_csv_include_initial.yaml", r"invalid_csv_include_initial\.yaml:5: webots\.csv\.include_initial must be a boolean if provided"),
     ],
 )
 def test_parse_webots_section_rejects_invalid_csv(fixture, message):

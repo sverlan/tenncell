@@ -194,6 +194,9 @@ class WebotsTransformer(BaseTransformer):
             self.add_line("csv_writer = csv.writer(csv_file)", 1)
             self.add_line(f"csv_writer.writerow({header!r})", 1)
             self.add_line("step_index = 0", 1)
+            if config.csv.include_initial:
+                self.add_line("variables = nnc.get_variables()", 1)
+                self._emit_csv_row(1)
             self.add_line()
 
         self.add_line("while robot.step(timestep) != -1:", 1)
@@ -212,17 +215,8 @@ class WebotsTransformer(BaseTransformer):
             self.add_line("nnc.step()", 2)
         self.add_line("variables = nnc.get_variables()", 2)
         if config.csv is not None:
-            row_items = [
-                *(["step_index"] if config.csv.include_step else []),
-                *(["robot.getTime()"] if config.csv.include_time else []),
-                *[
-                    f"variables[{variable!r}]"
-                    for variable in config.csv.variables
-                ],
-            ]
-            self.add_line(f"csv_writer.writerow([{', '.join(row_items)}])", 2)
-            self.add_line("csv_file.flush()", 2)
             self.add_line("step_index += 1", 2)
+            self._emit_csv_row(2)
         if system.output_variables:
             for variable in system.output_variables.keys():
                 binding = config.bindings[variable]
@@ -236,6 +230,20 @@ class WebotsTransformer(BaseTransformer):
         self.add_line()
         self.add_line("if __name__ == '__main__':")
         self.add_line("main()", 1)
+
+    def _emit_csv_row(self, indent: int) -> None:
+        """Emit one CSV row write for the current Webots variable snapshot."""
+        assert self._emission_context is not None
+        csv_config = self._emission_context.config.csv
+        assert csv_config is not None
+
+        row_items = [
+            *(["step_index"] if csv_config.include_step else []),
+            *(["robot.getTime()"] if csv_config.include_time else []),
+            *[f"variables[{variable!r}]" for variable in csv_config.variables],
+        ]
+        self.add_line(f"csv_writer.writerow([{', '.join(row_items)}])", indent)
+        self.add_line("csv_file.flush()", indent)
 
     @staticmethod
     def _format_webots_value(value: object) -> str:

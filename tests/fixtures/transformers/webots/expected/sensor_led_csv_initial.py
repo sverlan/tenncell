@@ -81,6 +81,9 @@ def main():
     csv_writer = csv.writer(csv_file)
     csv_writer.writerow(['_step', '_time', 'input_x', 'out'])
     step_index = 0
+    variables = nnc.get_variables()
+    csv_writer.writerow([step_index, robot.getTime(), variables['input_x'], variables['out']])
+    csv_file.flush()
 
     while robot.step(timestep) != -1:
         inputs = {

@@ -1,0 +1,28 @@
+# Sensor-led Webots controller with an initial CSV row.
+module:
+  name: sensor_led_controller
+cells:
+  - id: 1
+    contents:
+      - input_x = 0
+      - out = 0
+    input: [input_x]
+    output: [out]
+rules:
+  - input_x + 1 -> out
+webots:
+  controller_name: sensor_led_controller
+  timestep: 32
+  bindings:
+    input_x:
+      device: distance_sensor
+      read_method: getValue
+    out:
+      device: led
+      write_method: setValue
+  csv:
+    file: sensor_led.csv
+    variables: [input_x, out]
+    include_step: true
+    include_time: true
+    include_initial: true

@@ -284,6 +284,7 @@ The rules use TENNCell variable names; the bindings control which Webots methods
 
 Initialization entries under `webots.init` must refer to bindings with `write_method`.
 CSV entries under `webots.csv.variables` may refer to any TENNCell variable, not only inputs or outputs.
+By default, Webots CSV rows are written after controller steps and `_step` starts at `1`; set `include_initial: true` to add an initial `_step: 0` row.
 
 The backend does not generate Webots world or PROTO files. It only emits the
 controller glue that reads Webots devices, advances the generated TENNCell model,
@@ -324,6 +325,7 @@ webots:
     variables: [left_sensor, right_sensor, left_speed, right_speed]
     include_step: true
     include_time: true
+    include_initial: true
 ```
 
 ## Verilog backend metadata

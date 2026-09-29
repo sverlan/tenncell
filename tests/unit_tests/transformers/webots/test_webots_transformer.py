@@ -53,6 +53,18 @@ def test_webots_transformer_emits_csv_logging():
     assert transformer.transform(system) == expected_path.read_text(encoding="utf-8")
 
 
+def test_webots_transformer_emits_initial_csv_row_when_configured():
+    input_path = _fixture_path("input/sensor_led_csv_initial.yaml")
+    expected_path = _fixture_path("expected/sensor_led_csv_initial.py")
+    raw_cache: dict[Path, dict] = {}
+
+    system = NncSystem.from_yaml(str(input_path), _raw_data_cache=raw_cache)
+    transformer = WebotsTransformer()
+    transformer.set_webots_configs(_parse_webots_configs([system], raw_cache))
+
+    assert transformer.transform(system) == expected_path.read_text(encoding="utf-8")
+
+
 def test_webots_transformer_rejects_unknown_csv_variable():
     input_path = _fixture_path("input/sensor_led_csv_unknown_variable.yaml")
     raw_cache: dict[Path, dict] = {}

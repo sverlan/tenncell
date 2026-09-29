@@ -222,6 +222,8 @@
 - `webots.csv.file` is required when `webots.csv` is present and is emitted as the runtime file path passed to `open()`.
 - `webots.csv.variables` is required when `webots.csv` is present and may list any local TENNCell variable.
 - `webots.csv.include_step` and `webots.csv.include_time` are optional booleans that add `_step` and `_time` columns.
+- `webots.csv.include_initial` is an optional boolean that writes an initial variable snapshot before the controller loop and defaults to `false`.
+- Webots CSV `_step` values are state indices: optional initial rows use `_step = 0`, and after-step rows start at `_step = 1`.
 - A binding may be referenced for input, output, both, or initialization only, depending on the TENNCell model and the configured methods.
 - Webots emission consumes the resolved TENNCell model and does not require external header files.
 - Each declared TENNCell input variable must have a Webots binding with a `read_method`.
