@@ -5,13 +5,14 @@ from importlib import import_module
 __all__ = [
     "WebotsBindingConfig",
     "WebotsConfig",
+    "WebotsCsvConfig",
     "WebotsEmissionContext",
     "parse_webots_section",
 ]
 
 
 def __getattr__(name: str):
-    if name in {"WebotsBindingConfig", "WebotsConfig"}:
+    if name in {"WebotsBindingConfig", "WebotsConfig", "WebotsCsvConfig"}:
         return getattr(import_module(".webots_config", __name__), name)
     if name == "WebotsEmissionContext":
         return import_module(".emission_context", __name__).WebotsEmissionContext

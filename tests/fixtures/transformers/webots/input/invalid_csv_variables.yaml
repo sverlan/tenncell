@@ -1,0 +1,4 @@
+webots:
+  csv:
+    file: log.csv
+    variables: [x, 1]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ...inputs.yaml.sections import YamlSectionContext
 from ...inputs.yaml.errors import YamlLocatedError, as_yaml_located_error
-from .webots_config import WebotsBindingConfig, WebotsConfig
+from .webots_config import WebotsBindingConfig, WebotsConfig, WebotsCsvConfig
 
 
 def _require_mapping(raw: dict | None) -> dict:
@@ -93,6 +93,61 @@ def _parse_init(raw_init: dict[str, object] | None) -> dict[str, object]:
     }
 
 
+def _parse_csv(raw_csv: object, context: YamlSectionContext) -> WebotsCsvConfig | None:
+    if raw_csv is None:
+        return None
+    if not isinstance(raw_csv, dict):
+        raise YamlLocatedError(
+            "webots.csv must be a mapping if provided",
+            context.source_path,
+            context.locations.line_for("webots", "csv")
+            or context.locations.line_for("webots"),
+        )
+
+    file = raw_csv.get("file")
+    if not isinstance(file, str):
+        raise YamlLocatedError(
+            "webots.csv.file must be a string",
+            context.source_path,
+            context.locations.line_for("webots", "csv", "file")
+            or context.locations.line_for("webots", "csv"),
+        )
+
+    variables = raw_csv.get("variables")
+    if not isinstance(variables, list) or not all(
+        isinstance(variable, str) for variable in variables
+    ):
+        raise YamlLocatedError(
+            "webots.csv.variables must be a list of strings",
+            context.source_path,
+            context.locations.line_for("webots", "csv", "variables")
+            or context.locations.line_for("webots", "csv"),
+        )
+
+    include_step = raw_csv.get("include_step", False)
+    if not isinstance(include_step, bool):
+        raise YamlLocatedError(
+            "webots.csv.include_step must be a boolean if provided",
+            context.source_path,
+            context.locations.line_for("webots", "csv", "include_step"),
+        )
+
+    include_time = raw_csv.get("include_time", False)
+    if not isinstance(include_time, bool):
+        raise YamlLocatedError(
+            "webots.csv.include_time must be a boolean if provided",
+            context.source_path,
+            context.locations.line_for("webots", "csv", "include_time"),
+        )
+
+    return WebotsCsvConfig(
+        file=file,
+        variables=variables,
+        include_step=include_step,
+        include_time=include_time,
+    )
+
+
 def parse_webots_section(
     section: dict | None, context: YamlSectionContext
 ) -> WebotsConfig:
@@ -139,9 +194,11 @@ def parse_webots_section(
         )
     bindings = _parse_bindings(raw_bindings, context)
     init = _parse_init(raw_init)
+    csv = _parse_csv(data.get("csv"), context)
     return WebotsConfig(
         controller_name=controller_name,
         timestep=timestep,
         bindings=bindings,
         init=init,
+        csv=csv,
     )

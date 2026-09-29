@@ -88,3 +88,33 @@ def test_parse_webots_section_normalizes_special_init_values():
 
     assert config.init["left_position"] == float("inf")
     assert math.isnan(config.init["right_position"])
+
+
+def test_parse_webots_section_parses_csv_logging():
+    path = _fixture_path("sensor_led_csv.yaml")
+    context = _context(path)
+    config = parse_webots_section(context.raw_data["webots"], context)
+
+    assert config.csv is not None
+    assert config.csv.file == "sensor_led.csv"
+    assert config.csv.variables == ["input_x", "out"]
+    assert config.csv.include_step is True
+    assert config.csv.include_time is True
+
+
+@pytest.mark.parametrize(
+    ("fixture", "message"),
+    [
+        ("invalid_csv.yaml", r"invalid_csv\.yaml:2: webots\.csv must be a mapping if provided"),
+        ("invalid_csv_file.yaml", r"invalid_csv_file\.yaml:3: webots\.csv\.file must be a string"),
+        ("invalid_csv_variables.yaml", r"invalid_csv_variables\.yaml:4: webots\.csv\.variables must be a list of strings"),
+        ("invalid_csv_include_step.yaml", r"invalid_csv_include_step\.yaml:5: webots\.csv\.include_step must be a boolean if provided"),
+        ("invalid_csv_include_time.yaml", r"invalid_csv_include_time\.yaml:5: webots\.csv\.include_time must be a boolean if provided"),
+    ],
+)
+def test_parse_webots_section_rejects_invalid_csv(fixture, message):
+    path = _fixture_path(fixture)
+    context = _context(path)
+
+    with pytest.raises(YamlLocatedError, match=message):
+        parse_webots_section(context.raw_data["webots"], context)

@@ -217,6 +217,10 @@
 - Each binding must define at least one method.
 - `webots.init` is an optional mapping of local TENNCell variable names to one-time initialization values.
 - `webots.init` values are emitted through the binding's `write_method`.
+- `webots.csv` is an optional mapping that enables CSV logging from the generated controller.
+- `webots.csv.file` is required when `webots.csv` is present and is emitted as the runtime file path passed to `open()`.
+- `webots.csv.variables` is required when `webots.csv` is present and may list any local TENNCell variable.
+- `webots.csv.include_step` and `webots.csv.include_time` are optional booleans that add `_step` and `_time` columns.
 - A binding may be referenced for input, output, both, or initialization only, depending on the TENNCell model and the configured methods.
 - Webots emission consumes the resolved TENNCell model and does not require external header files.
 - Each declared TENNCell input variable must have a Webots binding with a `read_method`.

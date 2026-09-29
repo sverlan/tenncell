@@ -6,6 +6,24 @@ from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
+class WebotsCsvConfig:
+    """Describe optional CSV logging emitted by the Webots controller.
+
+    Args:
+        file: File path passed to ``open()`` by the generated controller.
+        variables: TENNCell variables written as CSV columns after each step.
+        include_step: Whether to prepend a generated ``_step`` column.
+        include_time: Whether to prepend a generated ``_time`` column using
+            ``robot.getTime()``.
+    """
+
+    file: str
+    variables: list[str]
+    include_step: bool = False
+    include_time: bool = False
+
+
+@dataclass(slots=True)
 class WebotsBindingConfig:
     """Describe one TENNCell variable bound to a Webots device.
 
@@ -37,6 +55,7 @@ class WebotsConfig:
             calls ``robot.getBasicTimeStep()``.
         bindings: Mapping from TENNCell variable names to Webots device bindings.
         init: One-time initialization values written before the controller loop.
+        csv: Optional CSV logging configuration.
 
     Validation assumptions:
         The Webots YAML parser supplies normalized special values such as
@@ -48,3 +67,4 @@ class WebotsConfig:
     timestep: int | None = None
     bindings: dict[str, WebotsBindingConfig] = field(default_factory=dict)
     init: dict[str, object] = field(default_factory=dict)
+    csv: WebotsCsvConfig | None = None

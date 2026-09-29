@@ -274,12 +274,14 @@ The `webots` backend emits a single Python controller file:
 - binds TENNCell input variables to configured Webots device read methods
 - binds TENNCell output variables and initialization values to configured device write methods
 - uses `webots.timestep` when provided, otherwise reads the basic timestep from the robot
+- can optionally write a CSV trace during controller execution with `webots.csv`
 
 Each declared TENNCell input must have a binding with `read_method`.
 Each declared TENNCell output must have a binding with `write_method`.
 The rules use TENNCell variable names; the bindings control which Webots methods read or write those variables.
 
 Initialization entries under `webots.init` must refer to bindings with `write_method`.
+CSV entries under `webots.csv.variables` may refer to any TENNCell variable, not only inputs or outputs.
 
 The backend does not generate Webots world or PROTO files. It only emits the
 controller glue that reads Webots devices, advances the generated TENNCell model,
@@ -315,6 +317,11 @@ webots:
   init:
     left_position: inf
     right_position: inf
+  csv:
+    file: e_puck_pid.csv
+    variables: [left_sensor, right_sensor, left_speed, right_speed]
+    include_step: true
+    include_time: true
 ```
 
 ## Verilog backend metadata

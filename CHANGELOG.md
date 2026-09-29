@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+- Added optional Webots controller CSV logging through `webots.csv`, including selected variable columns and optional step/time columns.
+
 ## 0.7.1
 
 - Rejected duplicate YAML initial declarations in `cells[].contents`, including same-cell redeclarations and cross-cell redeclarations.

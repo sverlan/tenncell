@@ -69,6 +69,8 @@ class WebotsTransformer(BaseTransformer):
 
         embedded_python = self._python_transformer.transform(system, include_main=False)
         self.add_line('"""Generated Webots controller from TENNCell system."""')
+        if config.csv is not None:
+            self.add_line("import csv")
         self.add_line("from controller import Robot")
         self.add_line()
         for line in embedded_python.splitlines():
@@ -103,6 +105,13 @@ class WebotsTransformer(BaseTransformer):
                 raise ValueError(
                     f"Webots init references '{variable}' without a write method"
                 )
+        if config.csv is not None:
+            for variable in config.csv.variables:
+                if variable not in known_variables:
+                    raise ValueError(
+                        "Webots CSV configuration references unknown TENNCell "
+                        f"variable '{variable}'"
+                    )
 
         for variable in system.input_variables.keys():
             binding = config.bindings.get(variable)
@@ -175,6 +184,18 @@ class WebotsTransformer(BaseTransformer):
                 )
             self.add_line()
 
+        if config.csv is not None:
+            header = [
+                *(["_step"] if config.csv.include_step else []),
+                *(["_time"] if config.csv.include_time else []),
+                *config.csv.variables,
+            ]
+            self.add_line(f"csv_file = open({config.csv.file!r}, 'w', newline='')", 1)
+            self.add_line("csv_writer = csv.writer(csv_file)", 1)
+            self.add_line(f"csv_writer.writerow({header!r})", 1)
+            self.add_line("step_index = 0", 1)
+            self.add_line()
+
         self.add_line("while robot.step(timestep) != -1:", 1)
         if system.input_variables:
             self.add_line("inputs = {", 2)
@@ -190,6 +211,18 @@ class WebotsTransformer(BaseTransformer):
         else:
             self.add_line("nnc.step()", 2)
         self.add_line("variables = nnc.get_variables()", 2)
+        if config.csv is not None:
+            row_items = [
+                *(["step_index"] if config.csv.include_step else []),
+                *(["robot.getTime()"] if config.csv.include_time else []),
+                *[
+                    f"variables[{variable!r}]"
+                    for variable in config.csv.variables
+                ],
+            ]
+            self.add_line(f"csv_writer.writerow([{', '.join(row_items)}])", 2)
+            self.add_line("csv_file.flush()", 2)
+            self.add_line("step_index += 1", 2)
         if system.output_variables:
             for variable in system.output_variables.keys():
                 binding = config.bindings[variable]

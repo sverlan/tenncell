@@ -32,6 +32,7 @@ from nnc.transformers.verilog.hardware_config import (
 from nnc.transformers.webots.webots_config import (
     WebotsBindingConfig,
     WebotsConfig,
+    WebotsCsvConfig,
 )
 
 
@@ -118,10 +119,12 @@ class TestWebotsInit:
         from nnc.transformers.webots import (
             WebotsBindingConfig as ExportedWebotsBindingConfig,
             WebotsConfig as ExportedWebotsConfig,
+            WebotsCsvConfig as ExportedWebotsCsvConfig,
         )
 
         assert ExportedWebotsBindingConfig is WebotsBindingConfig
         assert ExportedWebotsConfig is WebotsConfig
+        assert ExportedWebotsCsvConfig is WebotsCsvConfig
 
     def test_missing_export_raises_attribute_error(self):
         """Test that unknown names are rejected by the lazy loader."""
