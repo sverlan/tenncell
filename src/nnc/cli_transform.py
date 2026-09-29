@@ -55,6 +55,11 @@ def main():
         description=f"TENNCell Transformer v{__version__} - Convert TENNCell systems to various output formats",
         prog="nnc-gen",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"nnc-gen {__version__}",
+    )
 
     parser.add_argument(
         "system_files", nargs="+", help="TENNCell system files (.yaml) to transform"

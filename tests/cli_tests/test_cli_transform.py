@@ -11,6 +11,7 @@ import pytest
 from nnc.cli_transform import _collect_import_closure, _parse_verilog_configs
 from nnc.inputs.yaml.module_config import ImportConfig
 from nnc.model.system import NncSystem
+from nnc._version import __version__
 from nnc.cli_transform import TRANSFORMERS, get_transformer, main
 from nnc.transformers import PythonTransformer, VerilogTransformer, WebotsTransformer
 
@@ -66,6 +67,15 @@ class TestMain:
             with pytest.raises(SystemExit) as excinfo:
                 main()
             assert excinfo.value.code == 0
+
+    def test_main_version(self):
+        with patch("sys.argv", ["nnc-gen", "--version"]):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                with pytest.raises(SystemExit) as excinfo:
+                    main()
+
+        assert excinfo.value.code == 0
+        assert mock_stdout.getvalue() == f"nnc-gen {__version__}\n"
 
     def test_main_no_args(self):
         with patch("sys.argv", ["nnc-gen"]):

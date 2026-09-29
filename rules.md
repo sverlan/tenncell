@@ -12,6 +12,7 @@
 
 ## CLI Behavior
 - `nnc-gen` processes all requested input files in batch mode.
+- `nnc-sim --version` and `nnc-gen --version` print the command name and TENNCell version.
 - If any requested input file is missing or any file fails to transform, the command still attempts remaining files but exits with status code `1`.
 - If all requested files transform successfully, `nnc-gen` exits with status code `0`.
 - YAML loader and transformer errors should include the originating YAML file path and line number when the parser has source-location data.

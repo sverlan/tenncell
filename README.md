@@ -25,7 +25,7 @@ If you want to try the package immediately, start with one of the examples:
 
 - simulate a standalone TENNCell file: `nnc-sim examples/simple/example1.yaml`
 - generate Verilog from a typed FPGA example: `nnc-gen examples/fpga/blink_uart_typed/blink_uart_typed.yaml -t verilog`
-- inspect the available commands: `nnc-sim --help` and `nnc-gen --help`
+- inspect the available commands and version: `nnc-sim --help`, `nnc-gen --help`, `nnc-sim --version`, and `nnc-gen --version`
 
 The `python -m nnc` form invokes the simulator with the same defaults as `nnc-sim`.
 
@@ -54,6 +54,7 @@ nnc-sim examples/simple/example1.yaml -c -s 10
 ```
 
 The `--csv` flag only affects compute mode and makes the output CSV-formatted.
+Use `nnc-sim --version` to print the simulator version.
 
 The simulator supports standalone TENNCell YAML and import-composed TENNCell systems.
 
@@ -71,6 +72,7 @@ Options:
 - `--import-path DIR`: extra import search path, may be repeated
 - `--import-paths LIST`: path-separated import search list
 - `-v`, `--verbose`: verbose logging
+- `--version`: print the `nnc-gen` version
 
 Import resolution order:
 1. relative to the importing YAML file

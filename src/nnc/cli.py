@@ -24,6 +24,11 @@ def _run() -> int:
         description=f"TENNCell simulator v{__version__}", prog="nnc-sim"
     )
     parser.add_argument(
+        "--version",
+        action="version",
+        version=f"nnc-sim {__version__}",
+    )
+    parser.add_argument(
         "system_file",
         type=Path,
         help="The file containing the description of the TENNCell system",

@@ -9,6 +9,18 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from nnc.cli import main
+from nnc._version import __version__
+
+
+def test_sim_cli_version():
+    with patch("sys.argv", ["nnc-sim", "--version"]):
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            try:
+                main()
+            except SystemExit as exit_error:
+                assert exit_error.code == 0
+
+    assert mock_stdout.getvalue() == f"nnc-sim {__version__}\n"
 
 
 def test_compute_mode_runs_without_csv_input():
