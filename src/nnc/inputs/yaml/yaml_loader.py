@@ -8,7 +8,8 @@ from ...parser import parse_variable_assignment
 from ...parser.ast.value import FloatValue
 from ...parser.ast.variable import Variable
 from .errors import as_yaml_located_error
-from .locations import YamlLocationIndex, load_yaml_data_and_locations
+from .includes import load_yaml_with_includes
+from .locations import YamlLocationIndex
 from .lowering import (
     ExpandedRepeatItem,
     build_state_constants,
@@ -26,10 +27,14 @@ if TYPE_CHECKING:  # pragma: no cover
     from ...model.system import NncSystem
 
 
-def _load_raw_yaml_document(file_path: str) -> RawYamlDocument:
+def _load_raw_yaml_document(
+    file_path: str,
+    import_paths: list[str] | None = None,
+) -> RawYamlDocument:
     """Load and normalize a TENNCell YAML file into a raw document."""
     source_path = Path(file_path).resolve()
-    data, locations = load_yaml_data_and_locations(source_path)
+    import_paths_resolved = [Path(path).resolve() for path in (import_paths or [])]
+    data, locations = load_yaml_with_includes(source_path, import_paths_resolved)
     return RawYamlDocument.from_data(source_path, data, locations)
 
 def _build_system_from_raw_document(
@@ -311,7 +316,7 @@ def load_system_from_yaml(
     _raw_data_cache: dict[Path, dict] | None = None,
 ):
     """Load a TENNCell system from YAML and lower it into the in-memory model."""
-    raw_document = _load_raw_yaml_document(file_path)
+    raw_document = _load_raw_yaml_document(file_path, import_paths)
     return _build_system_from_raw_document(
         system_cls,
         raw_document,

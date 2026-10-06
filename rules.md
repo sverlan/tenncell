@@ -159,6 +159,18 @@
 - Repeat validation errors point to the original repeat block or invalid field where available; errors from generated items point to the repeat block/list that produced them.
 - `repeat` is pure syntactic sugar and does not introduce arrays, runtime loops, or backend-specific generation behavior.
 
+## Include Fragments
+- Root YAML files may declare `module.include` as a string path or list of string paths.
+- Included files are YAML section fragments, not TENNCell module imports.
+- Included files must be YAML mappings containing top-level sections such as `constants`, `aliases`, `cells`, `imports`, `rules`, `fsm`, `verilog`, or `webots`.
+- Included files must not contain a `module` section; includes are non-recursive in v1.
+- Include paths resolve relative to the root YAML file first, then through the caller's import paths.
+- Includes are expanded before normal parsing, repeat lowering, backend metadata parsing, and semantic TENNCell imports.
+- Included fragments are merged in listed order, then the root document is merged after removing `module.include`.
+- Mappings merge recursively. Scalars must be identical or the loader raises a conflict error.
+- Known list sections concatenate in merge order: `cells`, `imports`, `rules`, `fsm`, `verilog.ports`, and `webots.csv.variables`.
+- Includes do not create aliases, module boundaries, runtime child systems, Verilog submodules, or import connections. Use `imports` for semantic TENNCell module composition.
+
 ## FSM Sugar
 - Top-level `fsm` is supported as YAML sugar for state-scoped rules.
 - Multiple FSMs may exist in one module.

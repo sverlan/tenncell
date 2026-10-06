@@ -1,0 +1,4 @@
+constants:
+  START: 1
+  INCLUDED_INCREMENT: 2
+  ROOT_INCREMENT: 1

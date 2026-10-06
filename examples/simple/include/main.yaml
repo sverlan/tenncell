@@ -1,0 +1,15 @@
+# Demonstrates module.include with section fragments.
+module:
+  name: include_example
+  include:
+    - constants.yaml
+    - rules.yaml
+
+cells:
+  - id: 1
+    contents:
+      - x = START
+    output: [x]
+
+rules:
+  - x + ROOT_INCREMENT -> x

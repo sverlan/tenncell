@@ -13,28 +13,78 @@ from .lexical import sanitize_bang_prefixed_scalars
 
 
 @dataclass(slots=True)
-class YamlLocationIndex:
-    """Path-to-line index for one YAML source file."""
+class YamlLocation:
+    """Physical YAML source location for one effective document path."""
 
     source_path: Path
-    paths: dict[tuple[object, ...], int]
+    line: int | None
+
+
+@dataclass(slots=True)
+class YamlLocationIndex:
+    """Path-to-source-location index for one effective YAML document."""
+
+    source_path: Path
+    paths: dict[tuple[object, ...], YamlLocation | int]
+
+    def __post_init__(self) -> None:
+        """Normalize legacy path-to-line dictionaries into location entries."""
+        self.paths = {
+            path: (
+                location
+                if isinstance(location, YamlLocation)
+                else YamlLocation(self.source_path, location)
+            )
+            for path, location in self.paths.items()
+        }
+
+    def location_for(self, *path: object) -> YamlLocation | None:
+        """Return the physical source location for a YAML path, if known."""
+        return self.paths.get(path)
+
+    def source_for(self, *path: object) -> Path:
+        """Return the physical source file for a YAML path or the root fallback."""
+        location = self.location_for(*path)
+        if location is None:
+            return self.source_path
+        return location.source_path
 
     def line_for(self, *path: object) -> int | None:
         """Return the 1-based line number for a YAML path, if known."""
-        return self.paths.get(path)
+        location = self.location_for(*path)
+        if location is None:
+            return None
+        return location.line
+
+    def location_under(self, *prefix: object) -> YamlLocation | None:
+        """Return the first known source location under a YAML path prefix."""
+        for path, location in self.paths.items():
+            if len(path) >= len(prefix) and path[: len(prefix)] == prefix:
+                return location
+        return None
 
     def first_line_under(self, *prefix: object) -> int | None:
         """Return the first known line number under a YAML path prefix."""
-        for path, line in self.paths.items():
-            if len(path) >= len(prefix) and path[: len(prefix)] == prefix:
-                return line
-        return None
+        location = self.location_under(*prefix)
+        if location is None:
+            return None
+        return location.line
+
+    def source_for_under(self, *prefix: object) -> Path:
+        """Return the first known source file under a YAML path prefix."""
+        location = self.location_under(*prefix)
+        if location is None:
+            return self.source_path
+        return location.source_path
 
     def error(self, message: str, *path: object) -> YamlLocatedError:
         """Build a located YAML error for this file and path."""
         from .errors import YamlLocatedError
 
-        return YamlLocatedError(message, self.source_path, self.line_for(*path))
+        location = self.location_for(*path) or self.location_under(*path)
+        if location is None:
+            return YamlLocatedError(message, self.source_path, None)
+        return YamlLocatedError(message, location.source_path, location.line)
 
 
 def _node_key(node: Node) -> object:

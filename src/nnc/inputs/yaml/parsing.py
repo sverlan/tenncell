@@ -33,7 +33,9 @@ def parse_constants(
             except Exception as e:
                 raise YamlLocatedError(
                     f"Error evaluating constant '{key}':\n{e}",
-                    source_path,
+                    locations.source_for("constants", key)
+                    if locations is not None
+                    else source_path,
                     locations.line_for("constants", key) if locations is not None else None,
                 )
         else:

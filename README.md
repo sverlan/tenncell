@@ -235,6 +235,29 @@ In the first version, `repeat` is supported only in `cells[].contents`,
 `cells[].input`, `cells[].output`, and top-level `rules`. See
 `examples/simple/repeat.yaml` for a standalone example.
 
+Use `module.include` to split long rules or backend metadata into smaller YAML
+fragments that are assembled before parsing:
+
+```yaml
+module:
+  name: controller
+  include:
+    - rules.yaml
+    - verilog_ports.yaml
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+```
+
+Included files are section fragments, not imported modules. They must not define
+`module`; put top-level sections such as `rules`, `constants`, `verilog`, or
+`webots` in them. Lists are appended and mappings are joined recursively; scalar
+conflicts are rejected instead of overridden. See `examples/simple/include/` for
+a complete include-based example.
+
 Qualified references supported by the parser:
 - local variable: `x`
 - imported TENNCell IO: `sensor0.level`

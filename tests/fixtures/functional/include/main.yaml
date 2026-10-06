@@ -1,0 +1,14 @@
+module:
+  name: include_contract
+  include:
+    - constants.yaml
+    - rules.yaml
+
+cells:
+  - id: 1
+    contents:
+      - x = START
+    output: [x]
+
+rules:
+  - x + 1 -> x

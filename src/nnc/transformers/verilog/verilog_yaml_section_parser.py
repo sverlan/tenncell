@@ -45,6 +45,24 @@ def _field_line(
     return locations.line_for(*path[:1])
 
 
+def _field_source(
+    locations: YamlLocationIndex | None, *path: object
+) -> Path | None:
+    """Look up the most specific available source file for a YAML field."""
+    if locations is None:
+        return None
+    location = locations.location_for(*path) or locations.location_under(*path)
+    if location is not None:
+        return location.source_path
+    if path:
+        location = locations.location_for(*path[:1]) or locations.location_under(
+            *path[:1]
+        )
+        if location is not None:
+            return location.source_path
+    return locations.source_path
+
+
 def _raise_field_error(
     message: str,
     locations: YamlLocationIndex | None,
@@ -55,7 +73,7 @@ def _raise_field_error(
         raise ValueError(message)
     raise YamlLocatedError(
         message,
-        locations.source_path,
+        _field_source(locations, *path),
         _field_line(locations, *path),
     )
 
@@ -284,26 +302,28 @@ def parse_verilog_section(
             section, context.raw_data.get("module"), context.locations
         )
     except Exception as e:
+        source_path = _field_source(context.locations, "verilog")
         raise as_yaml_located_error(
             e,
-            context.source_path,
+            source_path,
             context.locations.line_for("verilog")
             or context.locations.first_line_under(),
         )
     source = section or {}
     external_entries = source.get("externals", context.raw_data.get("externals", {}))
     if not isinstance(external_entries, dict):
-        raise YamlLocatedError(
+        raise context.locations.error(
             "verilog.externals must be a mapping of instance aliases",
-            context.source_path,
-            context.locations.line_for("verilog", "externals"),
+            "verilog",
+            "externals",
         )
     for alias, external_data in external_entries.items():
         if not isinstance(external_data, dict):
-            raise YamlLocatedError(
+            raise context.locations.error(
                 "verilog.externals entries must be mappings",
-                context.source_path,
-                context.locations.line_for("verilog", "externals", alias),
+                "verilog",
+                "externals",
+                alias,
             )
         definition: ExternalModuleSchema
         header_path = external_data.get("header")
@@ -321,7 +341,9 @@ def parse_verilog_section(
                     raise as_yaml_located_error(
                         YamlLocatedError(
                             f"Error parsing external header '{header_path}':\n{e}",
-                            context.source_path,
+                            context.locations.source_for(
+                                "verilog", "externals", alias, "header"
+                            ),
                             context.locations.line_for(
                                 "verilog", "externals", alias, "header"
                             ),
@@ -342,9 +364,16 @@ def parse_verilog_section(
                     "schema",
                 )
             except Exception as e:
+                source_path = _field_source(
+                    context.locations,
+                    "verilog",
+                    "externals",
+                    alias,
+                    "schema",
+                )
                 raise as_yaml_located_error(
                     e,
-                    context.source_path,
+                    source_path,
                     context.locations.line_for("verilog", "externals", alias, "schema")
                     or context.locations.line_for("verilog", "externals", alias)
                     or context.locations.line_for("verilog"),
@@ -352,10 +381,11 @@ def parse_verilog_section(
             header_value = None
             schema_value = schema_data
         else:
-            raise YamlLocatedError(
+            raise context.locations.error(
                 "verilog.externals entries must define either 'header' or 'schema'",
-                context.source_path,
-                context.locations.line_for("verilog", "externals", alias),
+                "verilog",
+                "externals",
+                alias,
             )
         config.externals.append(
             ExternalInstance(
