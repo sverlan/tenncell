@@ -8,9 +8,11 @@ from ...parser import parse_variable_assignment
 from ...parser.ast.value import FloatValue
 from ...parser.ast.variable import Variable
 from .errors import as_yaml_located_error
-from .locations import load_yaml_data_and_locations
+from .locations import YamlLocationIndex, load_yaml_data_and_locations
 from .lowering import (
+    ExpandedRepeatItem,
     build_state_constants,
+    expand_repeat_items,
     lower_fsm_rules,
     lower_rule_items,
     register_initial_declarations,
@@ -80,29 +82,33 @@ def _build_system_from_raw_document(
     initial_declarations: dict[str, tuple[int, int]] = {}
 
     for cell_index, cell_data in enumerate(raw_document.cells):
+        if isinstance(cell_data, dict) and "repeat" in cell_data:
+            raise raw_document.locations.error(
+                "repeat is not supported in top-level cells", "cells", cell_index
+            )
         cell_id = cell_data.get("id")
         if not isinstance(cell_id, int):
             raise raw_document.locations.error("Cell id must be an integer", "cells", cell_index)
         contents = {}
-        for content_index, variable_data in enumerate(cell_data.get("contents", [])):
+        expanded_contents = expand_repeat_items(
+            cell_data.get("contents", []),
+            raw_document.locations,
+            ("cells", cell_index, "contents"),
+        )
+        for content_index, expanded_item in enumerate(expanded_contents):
+            variable_data = expanded_item.value
             if isinstance(variable_data, dict) and "name" in variable_data:
                 variable_name = variable_data.get("name")
                 if not isinstance(variable_name, str):
                     raise raw_document.locations.error(
                         "Variable name must be a string",
-                        "cells",
-                        cell_index,
-                        "contents",
-                        content_index,
+                        *expanded_item.origin_path,
                     )
                 variable_value = variable_data.get("value")
                 if not isinstance(variable_value, int | float | str):
                     raise raw_document.locations.error(
                         "Variable value must be a number or string",
-                        "cells",
-                        cell_index,
-                        "contents",
-                        content_index,
+                        *expanded_item.origin_path,
                     )
                 variable = variables.get(
                     variable_name, Variable(variable_name, FloatValue(variable_value))
@@ -116,7 +122,7 @@ def _build_system_from_raw_document(
                     )
                 except ValueError as e:
                     raise raw_document.locations.error(
-                        str(e), "cells", cell_index, "contents", content_index
+                        str(e), *expanded_item.origin_path
                     ) from e
                 variables[variable_name] = variable
                 contents[variable_name] = variable
@@ -132,10 +138,7 @@ def _build_system_from_raw_document(
                     raise as_yaml_located_error(
                         raw_document.locations.error(
                             f"Error parsing variable assignment '{variable_data}':\n{e}",
-                            "cells",
-                            cell_index,
-                            "contents",
-                            content_index,
+                            *expanded_item.origin_path,
                         )
                     )
                 try:
@@ -147,17 +150,41 @@ def _build_system_from_raw_document(
                     )
                 except ValueError as e:
                     raise raw_document.locations.error(
-                        str(e), "cells", cell_index, "contents", content_index
+                        str(e), *expanded_item.origin_path
                     ) from e
                 contents.update(parsed_variables)
                 variables.update(parsed_variables)
         cell = Cell(cell_id, contents)
         nnc.add_cell(cell)
 
-        for variable_name in cell_data.get("input", []):
-            nnc.input_variables[variable_name] = variables[variable_name]
-        for variable_name in cell_data.get("output", []):
-            nnc.output_variables[variable_name] = variables[variable_name]
+        expanded_inputs = expand_repeat_items(
+            cell_data.get("input", []),
+            raw_document.locations,
+            ("cells", cell_index, "input"),
+        )
+        for expanded_input in expanded_inputs:
+            variable_name = expanded_input.value
+            try:
+                nnc.input_variables[variable_name] = variables[variable_name]
+            except KeyError as e:
+                raise raw_document.locations.error(
+                    f"Input variable {variable_name} not defined",
+                    *expanded_input.origin_path,
+                ) from e
+        expanded_outputs = expand_repeat_items(
+            cell_data.get("output", []),
+            raw_document.locations,
+            ("cells", cell_index, "output"),
+        )
+        for expanded_output in expanded_outputs:
+            variable_name = expanded_output.value
+            try:
+                nnc.output_variables[variable_name] = variables[variable_name]
+            except KeyError as e:
+                raise raw_document.locations.error(
+                    f"Output variable {variable_name} not defined",
+                    *expanded_output.origin_path,
+                ) from e
 
     nnc.variables = variables
 
@@ -220,10 +247,19 @@ def _build_system_from_raw_document(
             )
 
     try:
-        for rule in lower_rule_items(
-            raw_document.rules, variables, nnc.constants, nnc.aliases
+        for expanded_rule in expand_repeat_items(
+            raw_document.rules,
+            raw_document.locations,
+            ("rules",),
         ):
-            nnc.add_rule(rule)
+            for rule in _lower_expanded_rule_item(
+                expanded_rule,
+                variables,
+                nnc.constants,
+                nnc.aliases,
+                raw_document.locations,
+            ):
+                nnc.add_rule(rule)
         for rule in lower_fsm_rules(
             raw_document.fsm, variables, nnc.constants, nnc.aliases, fsm_constants
         ):
@@ -243,6 +279,27 @@ def _build_system_from_raw_document(
         )
     loading_stack.pop()
     return nnc
+
+
+def _lower_expanded_rule_item(
+    expanded_rule: ExpandedRepeatItem,
+    variables: dict[str, Variable],
+    constants: dict[str, FloatValue],
+    aliases,
+    locations: YamlLocationIndex,
+):
+    """Lower one expanded rule item and report generated errors at its origin."""
+    try:
+        return lower_rule_items(
+            [expanded_rule.value],
+            variables,
+            constants,
+            aliases,
+        )
+    except Exception as e:
+        raise locations.error(
+            f"Error lowering YAML rules:\n{e}", *expanded_rule.origin_path
+        ) from e
 
 
 def load_system_from_yaml(

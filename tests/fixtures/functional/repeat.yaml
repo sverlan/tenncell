@@ -1,0 +1,23 @@
+module:
+  name: repeat_contract
+  description: Fixture covering list-only repeat sugar in contents, output, and rules.
+cells:
+  - id: 1
+    contents:
+      - repeat:
+          var: i
+          range: [0, 2]
+          body:
+            - x_${i} = ${i}
+    output:
+      - repeat:
+          var: i
+          range: [0, 2]
+          body:
+            - x_${i}
+rules:
+  - repeat:
+      var: i
+      range: [0, 2]
+      body:
+        - x_${i} + 1 -> x_${i}

@@ -144,6 +144,21 @@
 - Any rule-list field may be written as either a YAML list or a single rule item; the loader normalizes single items to one-element lists.
 - Structured `if` blocks are pure syntactic sugar and are lowered into ordinary guarded rules during YAML loading.
 
+## Repeat Sugar
+- `repeat` is list-only YAML sugar for generating repeated core TENNCell items during YAML loading.
+- In v1, `repeat` is supported only as a list item inside `cells[].contents`, `cells[].input`, `cells[].output`, and top-level `rules`.
+- `repeat` is not supported directly in the top-level `cells` list, backend metadata, `imports`, `constants`, `aliases`, or `module`.
+- A repeat item must define `var`, `range`, and `body`.
+- `var` must match `[A-Za-z_][A-Za-z0-9_]*`.
+- `range` is inclusive and must be `[start, end]` or `[start, end, step]`, with integer-only values.
+- `step` defaults to `1`, cannot be zero, must match the range direction, and must reach `end` exactly.
+- `body` must be a list and is spliced into the parent list once for every range value.
+- Placeholders use `${name}`, `${name+K}`, or `${name-K}` where `K` is a positive integer literal.
+- Exact scalar placeholders are lowered to integers; placeholders embedded in strings are replaced textually.
+- Nested repeats are allowed, outer repeat variables are visible to inner repeats, and reusing an active repeat variable name is rejected.
+- Repeat validation errors point to the original repeat block or invalid field where available; errors from generated items point to the repeat block/list that produced them.
+- `repeat` is pure syntactic sugar and does not introduce arrays, runtime loops, or backend-specific generation behavior.
+
 ## FSM Sugar
 - Top-level `fsm` is supported as YAML sugar for state-scoped rules.
 - Multiple FSMs may exist in one module.

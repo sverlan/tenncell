@@ -1,0 +1,38 @@
+module:
+  name: repeat_nested_ranges
+  description: Demonstrates nested repeat and inclusive ranges with custom steps.
+cells:
+  - id: 1
+    contents:
+      - repeat:
+          var: row
+          range: [0, 1]
+          body:
+            - repeat:
+                var: col
+                range: [0, 4, 2]
+                body:
+                  - grid_${row}_${col} = ${col}
+      - repeat:
+          var: down
+          range: [3, 1, -1]
+          body:
+            - down_${down} = ${down}
+    output:
+      - grid_1_4
+      - down_1
+rules:
+  - repeat:
+      var: row
+      range: [0, 1]
+      body:
+        - repeat:
+            var: col
+            range: [0, 4, 2]
+            body:
+              - grid_${row}_${col} + ${row+1} -> grid_${row}_${col}
+  - repeat:
+      var: down
+      range: [3, 1, -1]
+      body:
+        - down_${down} + 1 -> down_${down}

@@ -199,6 +199,32 @@ then:
 then: 1 -> y
 ```
 
+`repeat` can be used inside core TENNCell lists to generate repeated contents or
+rules. Ranges are inclusive, integer-only, and placeholders use `${i}`,
+`${i+K}`, or `${i-K}`:
+
+```yaml
+cells:
+  - id: 1
+    contents:
+      - repeat:
+          var: i
+          range: [0, 3]
+          body:
+            - x_${i} = ${i}
+
+rules:
+  - repeat:
+      var: i
+      range: [1, 3]
+      body:
+        - x_${i-1} + 1 -> x_${i}
+```
+
+In the first version, `repeat` is supported only in `cells[].contents`,
+`cells[].input`, `cells[].output`, and top-level `rules`. See
+`examples/simple/repeat.yaml` for a standalone example.
+
 Qualified references supported by the parser:
 - local variable: `x`
 - imported TENNCell IO: `sensor0.level`
