@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ...csv_format import validate_csv_delimiter, validate_csv_precision
 from ...inputs.yaml.sections import YamlSectionContext
 from ...inputs.yaml.errors import YamlLocatedError, as_yaml_located_error
 from .webots_config import WebotsBindingConfig, WebotsConfig, WebotsCsvConfig
@@ -148,12 +149,38 @@ def _parse_csv(raw_csv: object, context: YamlSectionContext) -> WebotsCsvConfig 
             context.locations.line_for("webots", "csv", "include_initial"),
         )
 
+    try:
+        delimiter = validate_csv_delimiter(
+            raw_csv.get("delimiter", ","), field_name="webots.csv.delimiter"
+        )
+    except ValueError as e:
+        raise YamlLocatedError(
+            str(e),
+            context.source_path,
+            context.locations.line_for("webots", "csv", "delimiter")
+            or context.locations.line_for("webots", "csv"),
+        ) from e
+
+    try:
+        precision = validate_csv_precision(
+            raw_csv.get("precision"), field_name="webots.csv.precision"
+        )
+    except ValueError as e:
+        raise YamlLocatedError(
+            str(e),
+            context.source_path,
+            context.locations.line_for("webots", "csv", "precision")
+            or context.locations.line_for("webots", "csv"),
+        ) from e
+
     return WebotsCsvConfig(
         file=file,
         variables=variables,
         include_step=include_step,
         include_time=include_time,
         include_initial=include_initial,
+        delimiter=delimiter,
+        precision=precision,
     )
 
 

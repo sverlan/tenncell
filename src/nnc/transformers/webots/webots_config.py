@@ -17,6 +17,8 @@ class WebotsCsvConfig:
             ``robot.getTime()``.
         include_initial: Whether to write the initial variable snapshot before
             the Webots controller loop.
+        delimiter: CSV delimiter used by the generated logger.
+        precision: Optional fixed decimal precision for numeric CSV values.
     """
 
     file: str
@@ -24,6 +26,8 @@ class WebotsCsvConfig:
     include_step: bool = False
     include_time: bool = False
     include_initial: bool = False
+    delimiter: str = ","
+    precision: int | None = None
 
 
 @dataclass(slots=True)

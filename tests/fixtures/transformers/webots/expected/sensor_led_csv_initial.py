@@ -2,6 +2,12 @@
 import csv
 from controller import Robot
 
+def format_csv_value(value, precision=None):
+    """Format one value for CSV output."""
+    if precision is not None and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{value:.{precision}f}"
+    return str(value)
+
 # Generated Python code from TENNCell system
 import math
 
@@ -78,11 +84,11 @@ def main():
         devices['input_x'].enable(timestep)
 
     csv_file = open('sensor_led.csv', 'w', newline='')
-    csv_writer = csv.writer(csv_file)
+    csv_writer = csv.writer(csv_file, delimiter=',')
     csv_writer.writerow(['_step', '_time', 'input_x', 'out'])
     step_index = 0
     variables = nnc.get_variables()
-    csv_writer.writerow([step_index, robot.getTime(), variables['input_x'], variables['out']])
+    csv_writer.writerow([step_index, format_csv_value(robot.getTime(), None), format_csv_value(variables['input_x'], None), format_csv_value(variables['out'], None)])
     csv_file.flush()
 
     while robot.step(timestep) != -1:
@@ -92,7 +98,7 @@ def main():
         nnc.step(inputs)
         variables = nnc.get_variables()
         step_index += 1
-        csv_writer.writerow([step_index, robot.getTime(), variables['input_x'], variables['out']])
+        csv_writer.writerow([step_index, format_csv_value(robot.getTime(), None), format_csv_value(variables['input_x'], None), format_csv_value(variables['out'], None)])
         csv_file.flush()
         devices['out'].setValue(variables['out'])
 

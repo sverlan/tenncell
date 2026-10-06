@@ -101,6 +101,8 @@ def test_parse_webots_section_parses_csv_logging():
     assert config.csv.include_step is True
     assert config.csv.include_time is True
     assert config.csv.include_initial is False
+    assert config.csv.delimiter == ";"
+    assert config.csv.precision == 2
 
 
 def test_parse_webots_section_parses_initial_csv_logging():
@@ -121,6 +123,8 @@ def test_parse_webots_section_parses_initial_csv_logging():
         ("invalid_csv_include_step.yaml", r"invalid_csv_include_step\.yaml:5: webots\.csv\.include_step must be a boolean if provided"),
         ("invalid_csv_include_time.yaml", r"invalid_csv_include_time\.yaml:5: webots\.csv\.include_time must be a boolean if provided"),
         ("invalid_csv_include_initial.yaml", r"invalid_csv_include_initial\.yaml:5: webots\.csv\.include_initial must be a boolean if provided"),
+        ("invalid_csv_delimiter.yaml", r"invalid_csv_delimiter\.yaml:5: webots\.csv\.delimiter must be a non-empty string"),
+        ("invalid_csv_precision.yaml", r"invalid_csv_precision\.yaml:5: webots\.csv\.precision must be a non-negative integer or null"),
     ],
 )
 def test_parse_webots_section_rejects_invalid_csv(fixture, message):

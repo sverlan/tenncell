@@ -1,0 +1,5 @@
+webots:
+  csv:
+    file: log.csv
+    variables: [out]
+    precision: -1

@@ -73,6 +73,9 @@ class WebotsTransformer(BaseTransformer):
             self.add_line("import csv")
         self.add_line("from controller import Robot")
         self.add_line()
+        if config.csv is not None:
+            self._emit_csv_format_function()
+            self.add_line()
         for line in embedded_python.splitlines():
             self.add_line(line)
         self.add_line()
@@ -191,7 +194,10 @@ class WebotsTransformer(BaseTransformer):
                 *config.csv.variables,
             ]
             self.add_line(f"csv_file = open({config.csv.file!r}, 'w', newline='')", 1)
-            self.add_line("csv_writer = csv.writer(csv_file)", 1)
+            self.add_line(
+                f"csv_writer = csv.writer(csv_file, delimiter={config.csv.delimiter!r})",
+                1,
+            )
             self.add_line(f"csv_writer.writerow({header!r})", 1)
             self.add_line("step_index = 0", 1)
             if config.csv.include_initial:
@@ -239,11 +245,30 @@ class WebotsTransformer(BaseTransformer):
 
         row_items = [
             *(["step_index"] if csv_config.include_step else []),
-            *(["robot.getTime()"] if csv_config.include_time else []),
-            *[f"variables[{variable!r}]" for variable in csv_config.variables],
+            *(
+                [f"format_csv_value(robot.getTime(), {csv_config.precision!r})"]
+                if csv_config.include_time
+                else []
+            ),
+            *[
+                f"format_csv_value(variables[{variable!r}], {csv_config.precision!r})"
+                for variable in csv_config.variables
+            ],
         ]
         self.add_line(f"csv_writer.writerow([{', '.join(row_items)}])", indent)
         self.add_line("csv_file.flush()", indent)
+
+    def _emit_csv_format_function(self) -> None:
+        """Emit the Webots CSV value formatter."""
+        self.add_line("def format_csv_value(value, precision=None):")
+        self.add_line('"""Format one value for CSV output."""', 1)
+        self.add_line(
+            "if precision is not None and isinstance(value, (int, float)) "
+            "and not isinstance(value, bool):",
+            1,
+        )
+        self.add_line('return f"{value:.{precision}f}"', 2)
+        self.add_line("return str(value)", 1)
 
     @staticmethod
     def _format_webots_value(value: object) -> str:

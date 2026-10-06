@@ -63,6 +63,30 @@ def test_compute_mode_writes_csv_output_without_double_cr():
     assert stdout.splitlines() == [b"step", b"0", b"1"]
 
 
+def test_compute_mode_csv_can_suppress_initial_row():
+    input_file = (
+        Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compute_mode.yaml"
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "nnc",
+            str(input_file),
+            "-c",
+            "-s",
+            "1",
+            "--csv",
+            "--csv-no-initial",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    assert result.stdout.splitlines() == [b"step", b"1"]
+
+
 def test_io_mode_writes_csv_output():
     input_file = (
         Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "io_mode.yaml"
@@ -86,6 +110,41 @@ def test_io_mode_writes_csv_output():
     assert exit_code == 0
     assert list(rows[0].keys()) == ["x", "y", "z"]
     assert len(rows) == 2
+
+
+def test_io_mode_csv_options_apply_to_input_and_output():
+    input_file = (
+        Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "io_mode.yaml"
+    )
+
+    with TemporaryDirectory() as tmp_dir:
+        tmp_dir = Path(tmp_dir)
+        csv_input = tmp_dir / "input.csv"
+        csv_output = tmp_dir / "output.csv"
+        csv_input.write_text("u\n1.25\n", encoding="utf-8")
+
+        with patch(
+            "sys.argv",
+            [
+                "nnc-sim",
+                str(input_file),
+                str(csv_input),
+                str(csv_output),
+                "--csv-include-initial",
+                "--csv-delimiter",
+                ";",
+                "--csv-precision",
+                "2",
+            ],
+        ):
+            exit_code = main()
+
+        output = csv_output.read_text(encoding="utf-8")
+
+    assert exit_code == 0
+    assert output.splitlines()[0] == "x;y;z"
+    assert output.splitlines()[1] == "0.00;0.00;0.00"
+    assert len(output.splitlines()) == 3
 
 
 def test_cli_returns_one_on_runtime_error():

@@ -223,6 +223,8 @@
 - `webots.csv.variables` is required when `webots.csv` is present and may list any local TENNCell variable.
 - `webots.csv.include_step` and `webots.csv.include_time` are optional booleans that add `_step` and `_time` columns.
 - `webots.csv.include_initial` is an optional boolean that writes an initial variable snapshot before the controller loop and defaults to `false`.
+- `webots.csv.delimiter` is an optional non-empty string and defaults to `","`.
+- `webots.csv.precision` is an optional non-negative integer or `null`; when absent or `null`, CSV values use default string conversion.
 - Webots CSV `_step` values are state indices: optional initial rows use `_step = 0`, and after-step rows start at `_step = 1`.
 - A binding may be referenced for input, output, both, or initialization only, depending on the TENNCell model and the configured methods.
 - Webots emission consumes the resolved TENNCell model and does not require external header files.
@@ -293,8 +295,14 @@
 - Generated Python scripts use the same CSV command-line behavior for standalone and composed systems.
 - Generated Python scripts with input variables read CSV rows from standard input until exhaustion, do not require a `steps` argument, and exit with status `1` if a required input column is missing.
 - Generated Python CSV output uses `lineterminator='\n'` so Windows stdout translation does not inject blank lines.
-- The simulator CLI uses the same CSV line-ending policy in compute mode when `--csv` is set.
-- Generated Python scripts without input variables require a `steps` argument and emit step `0` for the initial state.
+- The simulator CLI uses the same CSV line-ending policy when writing CSV.
+- CSV delimiter defaults to comma and applies to both CSV input and CSV output when a mode reads CSV.
+- CSV precision defaults to no explicit numeric formatting; when set, numeric output values are formatted with that many decimal places.
+- Initial CSV rows represent state before any executed step; after-step rows start at step `1`.
+- Simulator IO-mode CSV preserves the output-variable-only column shape; `--csv-include-initial` does not add a `step` column.
+- Autonomous CSV modes keep emitting an initial step `0` row by default and support `--csv-no-initial`.
+- Input-driven CSV modes omit the initial row by default and support `--csv-include-initial`.
+- Generated Python scripts without input variables require a `steps` argument.
 - `zero_reset_mode` is per-module and does not propagate across imports.
 - External Verilog modules are not part of the Python backend or runtime simulator configuration.
 - Python backend and simulation-only errors should preserve the originating YAML file path and line number when source-location data is available.

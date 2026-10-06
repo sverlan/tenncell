@@ -54,6 +54,12 @@ nnc-sim examples/simple/example1.yaml -c -s 10
 ```
 
 The `--csv` flag only affects compute mode and makes the output CSV-formatted.
+CSV output uses comma as the default delimiter. Use `--csv-delimiter` to change
+the delimiter for both CSV input and output, and `--csv-precision` to format
+numeric output values with a fixed number of decimal places. Compute-mode CSV
+includes the initial state as step `0` by default; use `--csv-no-initial` to suppress
+it. IO mode omits the initial row by default; use `--csv-include-initial` to emit
+the state before the first input row without adding a `step` column.
 Use `nnc-sim --version` to print the simulator version.
 
 The simulator supports standalone TENNCell YAML and import-composed TENNCell systems.
@@ -88,7 +94,7 @@ Example:
 nnc-gen examples/composition/python_composed/python_composed_controller.yaml -t python
 ```
 
-The generated file is a Python module. It exposes the TENNCell model as normal Python classes and methods, so you can import it into another script or run it directly as a generated artifact. If the source TENNCell system has inputs, the generated code uses the same CSV conventions as the simulator; otherwise it can be stepped directly. The generated main class exposes a `step` method for integration into a larger workflow.
+The generated file is a Python module. It exposes the TENNCell model as normal Python classes and methods, so you can import it into another script or run it directly as a generated artifact. If the source TENNCell system has inputs, the generated code uses the same CSV conventions as the simulator, including `--csv-delimiter`, `--csv-precision`, and `--csv-include-initial`; otherwise it can be stepped directly and supports `--csv-no-initial`. The generated main class exposes a `step` method for integration into a larger workflow.
 
 ### Webots backend
 `nnc-gen -t webots` generates a Python controller for Webots.
@@ -284,7 +290,7 @@ The rules use TENNCell variable names; the bindings control which Webots methods
 
 Initialization entries under `webots.init` must refer to bindings with `write_method`.
 CSV entries under `webots.csv.variables` may refer to any TENNCell variable, not only inputs or outputs.
-By default, Webots CSV rows are written after controller steps and `_step` starts at `1`; set `include_initial: true` to add an initial `_step: 0` row.
+By default, Webots CSV rows are written after controller steps and `_step` starts at `1`; set `include_initial: true` to add an initial `_step: 0` row. `webots.csv.delimiter` defaults to comma, and `webots.csv.precision` can be set to a non-negative integer to format numeric CSV values with fixed decimal places.
 
 The backend does not generate Webots world or PROTO files. It only emits the
 controller glue that reads Webots devices, advances the generated TENNCell model,
@@ -326,6 +332,8 @@ webots:
     include_step: true
     include_time: true
     include_initial: true
+    delimiter: ";"
+    precision: 3
 ```
 
 ## Verilog backend metadata

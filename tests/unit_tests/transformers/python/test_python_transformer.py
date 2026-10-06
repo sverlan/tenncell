@@ -49,7 +49,9 @@ class TestPythonTransformer:
     def test_transform_generates_csv_processing_for_inputs(self):
         result = assert_matches_fixture("csv_with_input.yaml", "csv_with_input.py")
         assert "import csv" in result
-        assert "reader = csv.DictReader(sys.stdin)" in result
+        assert "reader = csv.DictReader(sys.stdin, delimiter=args.csv_delimiter)" in result
+        assert "parser.add_argument('--csv-include-initial'" in result
+        assert "parser.add_argument('--csv-delimiter'" in result
         assert "required_inputs = ['input_x']" in result
         assert "inputs['input_x'] = float(input_row['input_x'])" in result
         assert "output = system.step(inputs)" in result
@@ -66,6 +68,7 @@ class TestPythonTransformer:
         assert "for step_num in range(args.steps):" in result
         assert "output = system.step()" in result
         assert "fieldnames = ['step'] + ['out']" in result
+        assert "parser.add_argument('--csv-no-initial'" in result
         assert "step0_row = {'step': 0}" in result
 
     def test_transform_generates_all_variables_output_without_outputs(self):

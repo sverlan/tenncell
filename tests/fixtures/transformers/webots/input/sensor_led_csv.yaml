@@ -25,3 +25,5 @@ webots:
     variables: [input_x, out]
     include_step: true
     include_time: true
+    delimiter: ";"
+    precision: 2
