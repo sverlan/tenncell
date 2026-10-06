@@ -144,22 +144,11 @@ def _run() -> int:
                     row.update(result)
                     writer.writerow(row)
             else:
-                print(
-                    f"Running in continuous compute mode for {args.steps} steps",
-                    file=output_handle,
-                )
-                result = {
-                    name: str(variable.value)
-                    for name, variable in nnc.output_variables.items()
-                }
-                print(f"Step: 0: {result}", file=output_handle)
+                rows = [_compute_json_row(0, nnc)]
                 for i in range(args.steps):
                     nnc.step()
-                    result = {
-                        name: str(variable.value)
-                        for name, variable in nnc.output_variables.items()
-                    }
-                    print(f"Step: {i + 1}: {result}", file=output_handle)
+                    rows.append(_compute_json_row(i + 1, nnc))
+                _write_compute_json_rows(output_handle, args.steps, rows)
         else:  # IO mode
             reader = csv.DictReader(input_handle, delimiter=csv_config.delimiter)
             writer = None
@@ -205,6 +194,39 @@ def _run() -> int:
 
                 writer.writerow(result)
     return 0
+
+
+def _compute_json_row(step: int, nnc: NncSystem) -> dict[str, float | int]:
+    """Return one flat compute-mode JSON output row."""
+    row: dict[str, float | int] = {"Step": step}
+    row.update(
+        {
+            name: variable.value.value
+            for name, variable in nnc.output_variables.items()
+        }
+    )
+    return row
+
+
+def _write_compute_json_rows(
+    output_handle, steps: int, rows: list[dict[str, float | int]]
+) -> None:
+    """Write compute-mode JSON with one row object per line."""
+    print("[", file=output_handle)
+    print(
+        f'{{"Message": "Running in continuous compute mode for {steps} steps"}},',
+        file=output_handle,
+    )
+    for index, row in enumerate(rows):
+        suffix = "," if index + 1 < len(rows) else ""
+        print(f"{_format_compute_json_row(row)}{suffix}", file=output_handle)
+    print("]", file=output_handle)
+
+
+def _format_compute_json_row(row: dict[str, float | int]) -> str:
+    """Format one flat compute-mode JSON row."""
+    items = ", ".join(f'"{key}": {value}' for key, value in row.items())
+    return "{" + items + "}"
 
 
 if __name__ == "__main__":

@@ -310,6 +310,7 @@
 - Generated Python scripts use the same CSV command-line behavior for standalone and composed systems.
 - Generated Python scripts with input variables read CSV rows from standard input until exhaustion, do not require a `steps` argument, and exit with status `1` if a required input column is missing.
 - Generated Python CSV output uses `lineterminator='\n'` so Windows stdout translation does not inject blank lines.
+- Simulator compute mode emits JSON by default as a single array. The first object contains `"Message"` with the run summary. Following row objects contain `"Step"` plus the declared output variables as numeric JSON values.
 - The simulator CLI uses the same CSV line-ending policy when writing CSV.
 - CSV delimiter defaults to comma and applies to both CSV input and CSV output when a mode reads CSV.
 - CSV precision defaults to no explicit numeric formatting; when set, numeric output values are formatted with that many decimal places.

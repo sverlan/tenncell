@@ -45,12 +45,22 @@ nnc-sim examples/simple/example1.yaml input.csv output.csv
 
 ### Compute mode
 - This mode does not consume CSV input.
-- It runs the system for a fixed number of steps and prints the output state.
+- It runs the system for a fixed number of steps and writes JSON output rows.
 - Use it when you want a bounded run with no CSV input file.
 
 Example:
 ```powershell
 nnc-sim examples/simple/example1.yaml -c -s 10
+```
+
+Default compute output is a JSON array. The first object contains the run
+message, followed by one flat object per step:
+```json
+[
+  {"Message": "Running in continuous compute mode for 1 steps"},
+  {"Step": 0, "x": 1.0},
+  {"Step": 1, "x": 2.0}
+]
 ```
 
 The `--csv` flag only affects compute mode and makes the output CSV-formatted.

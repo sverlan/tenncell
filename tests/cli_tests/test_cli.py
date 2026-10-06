@@ -1,6 +1,7 @@
 """CLI contract tests for `nnc-sim` simulation."""
 
 import csv
+import json
 import subprocess
 import sys
 from io import StringIO
@@ -32,10 +33,12 @@ def test_compute_mode_runs_without_csv_input():
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             exit_code = main()
 
-    output = mock_stdout.getvalue()
     assert exit_code == 0
-    assert "Running in continuous compute mode for 1 steps" in output
-    assert "Step: 1:" in output
+    assert json.loads(mock_stdout.getvalue()) == [
+        {"Message": "Running in continuous compute mode for 1 steps"},
+        {"Step": 0},
+        {"Step": 1},
+    ]
 
 
 def test_compute_mode_writes_csv_output_without_double_cr():
