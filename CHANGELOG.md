@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.3
+- Added CSV control options like `--csv-delimiter`
+- Added an include mechanism to include YAML fragments.
+- Added the syntactic sugar allowing to index variables and rules (via repeat node).
+
 ## 0.7.2
 
 - Added optional Webots controller CSV logging through `webots.csv`, including selected variable columns and optional step/time columns.
