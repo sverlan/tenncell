@@ -18,6 +18,8 @@ _LIST_MERGE_PATHS: set[tuple[object, ...]] = {
     ("fsm",),
     ("verilog", "ports"),
     ("webots", "csv", "variables"),
+    ("verification", "properties"),
+    ("verification", "backends", "mc2", "raw"),
 }
 
 

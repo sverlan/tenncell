@@ -13,7 +13,12 @@ from nnc.inputs.yaml.module_config import ImportConfig
 from nnc.model.system import NncSystem
 from nnc._version import __version__
 from nnc.cli_transform import TRANSFORMERS, get_transformer, main
-from nnc.transformers import PythonTransformer, VerilogTransformer, WebotsTransformer
+from nnc.transformers import (
+    Mc2Transformer,
+    PythonTransformer,
+    VerilogTransformer,
+    WebotsTransformer,
+)
 
 
 def _fixture_path(name: str) -> Path:
@@ -53,6 +58,10 @@ class TestGetTransformer:
     def test_get_transformer_webots(self):
         transformer = get_transformer("webots")
         assert isinstance(transformer, WebotsTransformer)
+
+    def test_get_transformer_mc2(self):
+        transformer = get_transformer("mc2")
+        assert isinstance(transformer, Mc2Transformer)
 
     def test_get_transformer_invalid_type(self):
         with pytest.raises(ValueError) as excinfo:
@@ -430,3 +439,93 @@ class TestWebotsMainContract:
                 error_output = mock_stderr.getvalue()
                 assert f"Error processing '{input_file}'" in error_output
                 assert "read_method must be a string" in error_output
+
+
+def _mc2_fixture_path(*parts: str) -> Path:
+    return Path(__file__).resolve().parents[1] / "fixtures" / Path(*parts)
+
+
+class TestMc2MainContract:
+    """CLI contract for ``nnc-gen -t mc2``."""
+
+    def test_writes_query_ids_and_columns_files_with_suffix(self):
+        input_file = _mc2_fixture_path("transformers", "mc2", "input", "imported_mc2.yaml")
+        expected_dir = _mc2_fixture_path("transformers", "mc2", "expected")
+        with TemporaryDirectory() as tmp_dir:
+            out_dir = Path(tmp_dir)
+            with patch(
+                "sys.argv",
+                [
+                    "nnc-gen",
+                    str(input_file),
+                    "-t",
+                    "mc2",
+                    "-o",
+                    str(out_dir),
+                    "--output-suffix",
+                    "_gen",
+                ],
+            ):
+                assert main() == 0
+
+            for suffix in (".mc2.pltl", ".mc2.ids", ".mc2.columns"):
+                generated = (out_dir / f"imported_mc2_gen{suffix}").read_text(
+                    encoding="utf-8"
+                )
+                expected = (expected_dir / f"imported_mc2{suffix}").read_text(
+                    encoding="utf-8"
+                )
+                assert generated == expected
+
+    def test_prints_skipped_property_warning(self):
+        input_file = _mc2_fixture_path("verification", "input", "fsm_counter_mc2.yaml")
+        with TemporaryDirectory() as tmp_dir:
+            with patch(
+                "sys.argv", ["nnc-gen", str(input_file), "-t", "mc2", "-o", tmp_dir]
+            ):
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    assert main() == 0
+
+        assert (
+            "Warning: " in mock_stderr.getvalue()
+            and "generic verification properties are not emitted by the MC2 raw "
+            "backend yet: bounded" in mock_stderr.getvalue()
+        )
+
+    def test_invalid_file_fails_but_batch_continues(self):
+        good_file = _mc2_fixture_path("verification", "input", "fsm_counter_mc2.yaml")
+        with TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            bad_file = tmp_path / "bad.yaml"
+            bad_file.write_text(
+                "cells:\n  - id: 1\n    contents:\n      - x = 0\n"
+                "verification:\n  backends:\n    prism: {}\n",
+                encoding="utf-8",
+            )
+            missing_raw = tmp_path / "no_raw.yaml"
+            missing_raw.write_text(
+                "cells:\n  - id: 1\n    contents:\n      - x = 0\n",
+                encoding="utf-8",
+            )
+            out_dir = tmp_path / "out"
+            with patch(
+                "sys.argv",
+                [
+                    "nnc-gen",
+                    str(bad_file),
+                    str(missing_raw),
+                    str(good_file),
+                    "-t",
+                    "mc2",
+                    "-o",
+                    str(out_dir),
+                ],
+            ):
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    assert main() == 1
+
+            errors = mock_stderr.getvalue()
+            assert "bad.yaml:7: Verification backend 'prism' is reserved" in errors
+            assert "No MC2 raw verification entries found" in errors
+            assert (out_dir / "fsm_counter_mc2.mc2.pltl").exists()
+            assert not (out_dir / "bad.mc2.pltl").exists()

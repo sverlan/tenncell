@@ -1,0 +1,93 @@
+# Verification example: the FSM counter from examples/fsm/fsm_counter.yaml
+# with MC2 raw queries.
+#
+# Generate the MC2 files:
+#   nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
+# This writes out/fsm_counter_mc2.mc2.pltl (one MC2 query per line),
+# out/fsm_counter_mc2.mc2.ids (the query IDs, in the same order), and
+# out/fsm_counter_mc2.mc2.columns (the trace columns the queries need).
+#
+# ${name} placeholders are checked against the model and rendered as bare
+# column names or numeric literals; the MC2 brackets are written by hand.
+# The generic `properties` entry is parsed but not emitted to MC2 yet, so
+# nnc-gen prints a warning about it.
+#
+# nnc-sim traces contain only output variables, so every variable the queries
+# use (ctrl_state, counter, done) is declared as an output below. MC2 reads the
+# first trace column as time, so add a step column (start.csv holds the input
+# rows below, space-separated like the trace):
+#   nnc-sim examples/verification/fsm_counter_mc2.yaml start.csv out/trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "
+#   java -jar MC2v2.0beta2.jar stoch out/trace.txt out/fsm_counter_mc2.mc2.pltl
+# MC2 prints 1.0,true,true for the three queries.
+module:
+  name: fsm_counter_mc2
+
+constants:
+  MAX_COUNT: 3
+
+cells:
+  - id: 1
+    contents:
+      - ctrl_state = 0
+      - counter = 0
+      - start = 0
+      - done = 0
+    input: [start]
+    output: [counter, done, ctrl_state]
+
+fsm:
+  - name: ctrl
+    variable: ctrl_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: start > 0
+              then:
+                - RUN -> ctrl_state
+                - counter * 0 -> counter
+                - done * 0 -> done
+              else:
+                - done * 0 -> done
+      - RUN:
+          rules:
+            - if: counter >= MAX_COUNT
+              then:
+                - DONE -> ctrl_state
+                - 1 -> done
+              else:
+                - counter + 1 -> counter
+      - DONE:
+          rules:
+            - done -> done
+
+verification:
+  environment:
+    start: { range: [0, 1] }
+  properties:
+    - id: counter_bounded
+      description: Planned generic form of the MC2 query below
+      always: counter <= MAX_COUNT
+  backends:
+    mc2:
+      raw:
+        - id: reaches_done
+          description: The controller eventually raises done
+          code: "P=?[ F([${done}] = 1) ]"
+        - id: never_overflows
+          description: The counter never exceeds MAX_COUNT
+          code: "P>=1[ G([${counter}] <= ${MAX_COUNT}) ]"
+        - id: done_in_done_state
+          description: Once in DONE, done is set
+          code: >-
+            P>=1[ G([${ctrl_state}] = ${ctrl.DONE}
+            -> [${done}] = 1) ]
+
+#Example of input CSV
+#start
+#0
+#0
+#1
+#0
+#1
+#0

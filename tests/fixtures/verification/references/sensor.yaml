@@ -1,0 +1,15 @@
+# Imported sensor module for verification reference tests.
+module:
+  name: sensor
+
+cells:
+  - id: 1
+    contents:
+      - raw = 0
+      - level = 0
+      - hidden = 0
+    input: [raw]
+    output: [level]
+
+rules:
+  - raw + hidden -> level

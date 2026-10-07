@@ -73,6 +73,11 @@ def _run() -> int:
         help="Write an initial state row before consuming CSV input in IO mode",
     )
     parser.add_argument(
+        "--csv-include-step",
+        action="store_true",
+        help="Prepend a step column to IO-mode CSV output (initial row is step 0)",
+    )
+    parser.add_argument(
         "--csv-no-initial",
         action="store_true",
         help="Suppress the initial state row in continuous CSV compute mode",
@@ -151,33 +156,20 @@ def _run() -> int:
                 _write_compute_json_rows(output_handle, args.steps, rows)
         else:  # IO mode
             reader = csv.DictReader(input_handle, delimiter=csv_config.delimiter)
+            fieldnames = (["step"] if args.csv_include_step else []) + list(
+                nnc.output_variables.keys()
+            )
             writer = None
             csv_config.include_initial = args.csv_include_initial
             if csv_config.include_initial:
-                fieldnames = list(nnc.output_variables.keys())
-                writer = csv.DictWriter(
-                    output_handle,
-                    fieldnames=fieldnames,
-                    delimiter=csv_config.delimiter,
-                    lineterminator="\n",
+                writer = _io_writer(output_handle, fieldnames, csv_config.delimiter)
+                writer.writerow(
+                    _io_row(nnc, 0, args.csv_include_step, csv_config.precision)
                 )
-                writer.writeheader()
-                initial_row = {
-                    name: format_csv_value(variable.value, csv_config.precision)
-                    for name, variable in nnc.output_variables.items()
-                }
-                writer.writerow(initial_row)
 
-            for csv_row in reader:
+            for step, csv_row in enumerate(reader, start=1):
                 if writer is None:
-                    fieldnames = list(nnc.output_variables.keys())
-                    writer = csv.DictWriter(
-                        output_handle,
-                        fieldnames=fieldnames,
-                        delimiter=csv_config.delimiter,
-                        lineterminator="\n",
-                    )
-                    writer.writeheader()
+                    writer = _io_writer(output_handle, fieldnames, csv_config.delimiter)
 
                 inputs = {}
                 for input_var_name, input_var_value in csv_row.items():
@@ -187,13 +179,36 @@ def _run() -> int:
 
                 nnc.step(inputs)
 
-                result = {
-                    name: format_csv_value(variable.value, csv_config.precision)
-                    for name, variable in nnc.output_variables.items()
-                }
-
-                writer.writerow(result)
+                writer.writerow(
+                    _io_row(nnc, step, args.csv_include_step, csv_config.precision)
+                )
     return 0
+
+
+def _io_writer(output_handle, fieldnames: list[str], delimiter: str) -> csv.DictWriter:
+    """Create the IO-mode CSV writer and write its header."""
+    writer = csv.DictWriter(
+        output_handle,
+        fieldnames=fieldnames,
+        delimiter=delimiter,
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    return writer
+
+
+def _io_row(
+    nnc: NncSystem, step: int, include_step: bool, precision: int | None
+) -> dict[str, object]:
+    """Return one IO-mode CSV row, optionally starting with the step index."""
+    row: dict[str, object] = {"step": step} if include_step else {}
+    row.update(
+        {
+            name: format_csv_value(variable.value, precision)
+            for name, variable in nnc.output_variables.items()
+        }
+    )
+    return row
 
 
 def _compute_json_row(step: int, nnc: NncSystem) -> dict[str, float | int]:

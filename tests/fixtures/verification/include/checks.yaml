@@ -1,0 +1,10 @@
+# Included fragment contributing verification entries.
+verification:
+  properties:
+    - id: fragment_property
+      never: x < 0
+  backends:
+    mc2:
+      raw:
+        - id: fragment_query
+          code: "P>=1[ G([${x}] >= 0) ]"

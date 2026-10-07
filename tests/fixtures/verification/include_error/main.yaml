@@ -1,0 +1,21 @@
+# Root fixture whose included fragment holds an MC2 raw entry with an
+# unknown placeholder; binding errors must point to the fragment.
+module:
+  name: include_error_main
+  include: checks.yaml
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verification:
+  backends:
+    mc2:
+      raw:
+        - id: root_query
+          code: "P=?[ F([${x}] > 2) ]"

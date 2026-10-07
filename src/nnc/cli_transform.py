@@ -11,12 +11,15 @@ from nnc.inputs.yaml.locations import YamlLocationIndex
 from nnc.model.system import NncSystem
 from nnc.transformers import (
     BaseTransformer,
+    Mc2Transformer,
     PythonTransformer,
     VerilogTransformer,
     WebotsTransformer,
 )
 from nnc.transformers.webots.webots_yaml_section_parser import parse_webots_section
 from nnc.transformers.verilog.verilog_yaml_section_parser import parse_verilog_section
+from nnc.verification.binding import BoundVerification, bind_verification
+from nnc.verification.section_parser import parse_verification_section
 from nnc._version import __version__
 
 
@@ -25,6 +28,7 @@ TRANSFORMERS: Dict[str, Type[BaseTransformer]] = {
     "python": PythonTransformer,
     "verilog": VerilogTransformer,
     "webots": WebotsTransformer,
+    "mc2": Mc2Transformer,
 }
 
 
@@ -159,10 +163,16 @@ def main():
                     _parse_webots_configs([nnc_system], raw_data_cache)
                 )
                 systems_to_emit = [nnc_system]
+            elif args.transform_type == "mc2":
+                assert isinstance(transformer, Mc2Transformer)
+                transformer.set_verification_configs(
+                    _parse_verification_configs([nnc_system], raw_data_cache)
+                )
+                systems_to_emit = [nnc_system]
             else:
                 systems_to_emit = [nnc_system]
             for system in systems_to_emit:
-                transformed_code = transformer.transform(system)
+                transformed_files = transformer.transform_files(system)
                 source_path = (
                     getattr(system, "__dict__", {}).get("source_path") or nnc_file
                 )
@@ -170,15 +180,16 @@ def main():
                 if args.output_suffix:
                     base_name += args.output_suffix
 
-                output_file = args.output_dir / (
-                    base_name + transformer.get_file_extension()
-                )
+                for suffix, content in transformed_files.items():
+                    output_file = args.output_dir / (base_name + suffix)
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(content)
 
-                with open(output_file, "w", encoding="utf-8") as f:
-                    f.write(transformed_code)
+                    if args.verbose:
+                        print(f"  -> {output_file}")
 
-                if args.verbose:
-                    print(f"  -> {output_file}")
+                for warning in transformer.warnings:
+                    print(f"Warning: {nnc_file}: {warning}", file=sys.stderr)
 
         except Exception as e:
             print(f"Error processing '{nnc_file}': {e}", file=sys.stderr)
@@ -263,6 +274,35 @@ def _parse_webots_configs(
             data, context, {"webots": parse_webots_section}
         )
         configs[system.source_path] = parsed["webots"]
+    return configs
+
+
+def _parse_verification_configs(
+    systems: list[NncSystem],
+    raw_data_cache: dict[Path, dict],
+) -> dict[Path, BoundVerification | None]:
+    configs: dict[Path, BoundVerification | None] = {}
+    for system in systems:
+        if system.source_path is None:
+            raise ValueError("MC2 export requires systems loaded from YAML files")
+        data = raw_data_cache[system.source_path]
+        locations = system.source_locations or YamlLocationIndex(
+            system.source_path, {}
+        )
+        context = YamlSectionContext(
+            source_path=system.source_path,
+            import_paths=[],
+            header_cache={},
+            raw_data=data,
+            locations=locations,
+        )
+        parsed = parse_registered_sections(
+            data, context, {"verification": parse_verification_section}
+        )
+        config = parsed["verification"]
+        configs[system.source_path] = (
+            None if config is None else bind_verification(config, system, locations)
+        )
     return configs
 
 

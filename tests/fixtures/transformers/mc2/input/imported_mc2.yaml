@@ -1,0 +1,43 @@
+# MC2 transformer fixture: imported IO columns, an alias to imported IO,
+# a non-integer constant, a negative constant, and the $${ escape.
+module:
+  name: imported_mc2
+
+imports:
+  - module: sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+
+constants:
+  LIMIT: 2.5
+  FLOOR: -1
+
+aliases:
+  sensed: sensor0.level
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+
+rules:
+  - sensor0.level > LIMIT | 1 -> alarm
+
+verification:
+  properties:
+    - id: native_only
+      always: alarm >= 0
+      targets: [native]
+  backends:
+    mc2:
+      raw:
+        - id: level_above_limit
+          code: "P=?[ F([${sensor0.level}] > ${LIMIT}) ]"
+        - id: alarm_follows
+          code: "P>=1[ G([${sensed}] > ${LIMIT} -> F([${alarm}] = 1)) ]"
+        - id: floor_and_escape
+          code: "P=?[ G([${sample}] >= ${FLOOR}) ] $${literal}"

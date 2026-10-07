@@ -3,11 +3,13 @@
 import pytest
 from nnc.transformers import (
     BaseTransformer,
+    Mc2Transformer,
     PythonTransformer,
     VerilogTransformer,
     WebotsTransformer,
 )
 from nnc.transformers.base_transformer import BaseTransformer as BaseTransformerClass
+from nnc.transformers.mc2_transformer import Mc2Transformer as Mc2TransformerClass
 from nnc.transformers.python_transformer import (
     PythonTransformer as PythonTransformerClass,
 )
@@ -43,6 +45,10 @@ class TestTransformersInit:
         """Test that BaseTransformer is imported correctly."""
         assert BaseTransformer is BaseTransformerClass
 
+    def test_mc2_transformer_import(self):
+        """Test that Mc2Transformer is imported correctly."""
+        assert Mc2Transformer is Mc2TransformerClass
+
     def test_python_transformer_import(self):
         """Test that PythonTransformer is imported correctly."""
         assert PythonTransformer is PythonTransformerClass
@@ -60,10 +66,11 @@ class TestTransformersInit:
         from nnc.transformers import __all__
 
         assert "BaseTransformer" in __all__
+        assert "Mc2Transformer" in __all__
         assert "PythonTransformer" in __all__
         assert "VerilogTransformer" in __all__
         assert "WebotsTransformer" in __all__
-        assert len(__all__) == 4
+        assert len(__all__) == 5
 
     def test_missing_export_raises_attribute_error(self):
         """Test that unknown names are rejected by the lazy loader."""

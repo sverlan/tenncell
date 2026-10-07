@@ -168,7 +168,7 @@
 - Includes are expanded before normal parsing, repeat lowering, backend metadata parsing, and semantic TENNCell imports.
 - Included fragments are merged in listed order, then the root document is merged after removing `module.include`.
 - Mappings merge recursively. Scalars must be identical or the loader raises a conflict error.
-- Known list sections concatenate in merge order: `cells`, `imports`, `rules`, `fsm`, `verilog.ports`, and `webots.csv.variables`.
+- Known list sections concatenate in merge order: `cells`, `imports`, `rules`, `fsm`, `verilog.ports`, `webots.csv.variables`, `verification.properties`, and `verification.backends.mc2.raw`.
 - Includes do not create aliases, module boundaries, runtime child systems, Verilog submodules, or import connections. Use `imports` for semantic TENNCell module composition.
 
 ## FSM Sugar
@@ -265,6 +265,7 @@
 - The Python runtime simulator and Python transformer consume TENNCell model semantics only. They support TENNCell imports and do not consume `verilog.externals`.
 - The Verilog transformer consumes TENNCell model semantics plus the `verilog` section. It supports TENNCell imports, `verilog.ports`, and `verilog.externals`.
 - The Webots transformer consumes TENNCell model semantics plus the `webots` section. It emits controller glue around generated Python TENNCell code and does not generate Webots world, PROTO, or RTL files.
+- The MC2 transformer consumes the root module's TENNCell model plus its `verification` section. It emits MC2 query, ID, and trace-column files only; it does not generate traces or run MC2.
 - Backend-specific sections are not parser aliases and should not be referenced from ordinary TENNCell expressions unless that backend explicitly defines such references.
 
 ## Supported Verilog Expression Subset
@@ -327,13 +328,59 @@
 - CSV delimiter defaults to comma and applies to both CSV input and CSV output when a mode reads CSV.
 - CSV precision defaults to no explicit numeric formatting; when set, numeric output values are formatted with that many decimal places.
 - Initial CSV rows represent state before any executed step; after-step rows start at step `1`.
-- Simulator IO-mode CSV preserves the output-variable-only column shape; `--csv-include-initial` does not add a `step` column.
+- Simulator IO-mode CSV preserves the output-variable-only column shape by default; `--csv-include-initial` does not add a `step` column.
+- `nnc-sim --csv-include-step` prepends a `step` column to IO-mode CSV output. The optional initial row has `step` `0`, and after-step rows start at `1`. Compute-mode CSV always includes `step`, so the option changes nothing there.
 - Autonomous CSV modes keep emitting an initial step `0` row by default and support `--csv-no-initial`.
 - Input-driven CSV modes omit the initial row by default and support `--csv-include-initial`.
 - Generated Python scripts without input variables require a `steps` argument.
 - `zero_reset_mode` is per-module and does not propagate across imports.
 - External Verilog modules are not part of the Python backend or runtime simulator configuration.
 - Python backend and simulation-only errors should preserve the originating YAML file path and line number when source-location data is available.
+
+## Verification
+- A top-level `verification` section and verification backends (`native`, `mc2`, `sva`) are specified in `docs/verification.md`.
+- The planned behavior becomes contractual only as implementation slices land; each slice adds its rules to this file.
+
+### Verification Section Parsing
+- `NncSystem.from_yaml()` ignores the `verification` section. It is parsed by `parse_verification_section()` on verification paths, which report errors with YAML file and line.
+- `verification` must be a mapping with only the keys `environment`, `trace_semantics`, `properties`, and `backends`.
+- `trace_semantics` is `strict` or `weak` and defaults to `strict`. A backend section may override it with its own `trace_semantics`.
+- `environment` maps input names (strings; other YAML keys are rejected) to mappings with an optional `range: [lo, hi]` of numbers with `lo <= hi`. `distribution` is reserved and rejected.
+- Accepted backend names are `native`, `mc2`, and `sva`. `prism`, `spin`, `english`, and `custom` are reserved and rejected; other names are rejected as unknown.
+- Backend keys: `native` accepts `trace_semantics`; `mc2` accepts `trace_semantics` and `raw`; `sva` accepts `trace_semantics` and `mode` (`simulation`, `formal`, or `both`; default `simulation`).
+- `native.raw` is rejected. `sva.raw` is rejected until the SVA backend is implemented.
+- Each `mc2.raw` entry has a required identifier `id`, an optional string `description`, and a required string `code`. Raw IDs are unique within `mc2.raw`. Exactly one final newline is stripped from `code`.
+- `properties` is a list of mappings with a required identifier `id` (unique among properties) and an optional `targets` list of backend names. Generic property kinds are not validated or emitted yet.
+- Include merging concatenates `verification.properties` and `verification.backends.mc2.raw`.
+
+### Verification Placeholders
+- Raw verification code is a template: `${name}` marks a reference to the TENNCell model, `$${` emits a literal `${`, and all other text is passed through unvalidated.
+- A placeholder name is an identifier, optionally followed by one `.member` part. An unclosed `${`, an empty `${}`, or an invalid name is an error.
+- A name may refer to a local variable, a constant, an FSM state (`ctrl.DONE`, lowered to `ctrl__DONE`), an imported input or output (`alias.port`), or an alias. Aliases resolve to the variable or imported input/output they reference.
+- All candidates are collected without priority. A name that matches nothing is an unknown-reference error; a name that matches more than one entity (for example a constant and a variable with the same name) is an ambiguous-reference error.
+- `verification.environment` keys must be root input variables.
+- Binding errors name the raw entry and point to the YAML line of its `code`.
+
+### MC2 Raw Backend
+- `nnc-gen -t mc2` generates MC2 query files from `verification.backends.mc2.raw` of the root YAML file. It does not run MC2.
+- For each root file it writes three files, each line ending with a newline:
+  - `<stem>.mc2.pltl`: one rendered MC2 query per raw entry, in YAML order, with no comments;
+  - `<stem>.mc2.ids`: the raw entry IDs, in the same order as the queries;
+  - `<stem>.mc2.columns`: the trace columns the queries reference, in first-use order.
+- `--output-suffix` is appended to `<stem>` for all three files.
+- If the root file has no `mc2.raw` entries, generation fails with "No MC2 raw verification entries found".
+- Each raw entry must be exactly one non-empty single-line query after the final newline is stripped; YAML folded style `>-` joins long queries onto one line.
+- Placeholders render as bare names; users write the MC2 brackets (`[${x}]`, `d[${x}]`, `max([${x}])`):
+  - a local variable renders as its name and is listed in `.mc2.columns`;
+  - an imported input or output `alias.port` renders as `alias__port` and is listed in `.mc2.columns`;
+  - an alias renders as its target;
+  - constants and FSM states render as numeric literals without exponent notation (`3`, `2.5`, `0.00001`) and are not listed as columns.
+- Generic `verification.properties` are not emitted yet. When properties target `mc2` (explicitly, or by having no `targets`), `nnc-gen` prints a warning to stderr: "generic verification properties are not emitted by the MC2 raw backend yet: <ids>".
+- `nnc-sim` traces contain only output variables. When a column in `.mc2.columns` is not a root output variable (an internal variable, a root input, or an imported input/output), `nnc-gen` prints a warning to stderr: "MC2 trace columns are not root outputs, so nnc-sim traces will not contain them: <columns>". Declaring a local variable as an output only exposes it and does not change simulation results.
+- MC2 reads the first trace column as time, so MC2 traces from IO mode need `nnc-sim --csv-include-step`.
+- MC2 v2.0beta2 accepts `^` (and), uppercase `V` (or), `->`/`=>` (implies), and the NOT sign U+00AC; `!` is only valid in `!=`. Raw MC2 code is passed through unchanged, so `nnc-gen` does not rewrite these operators.
+- An opt-in functional test runs generated queries and `nnc-sim` traces through MC2 when `NNC_MC2_JAR` points to the MC2 jar and `java` is on `PATH`; otherwise it is skipped.
+- `BaseTransformer.transform_files()` returns output files keyed by suffix; by default it emits one file from `transform()` and `get_file_extension()`. `nnc-gen` writes every returned file and prints transformer warnings to stderr.
 
 ## FPGA Examples
 - The `examples/fpga/ledwalk.yaml` Tang Nano 20K example uses active-low LED semantics (`0` drives LED ON) and implements a walking-zero pattern on `leds[5:0]`.

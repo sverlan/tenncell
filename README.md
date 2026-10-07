@@ -10,6 +10,7 @@ them to generated code.
 - Python source export through `nnc-gen -t python`, including import-composed systems as a single generated file
 - Verilog/SystemVerilog export through `nnc-gen -t verilog`
 - Webots Python controller export through `nnc-gen -t webots`
+- MC2 model-checker query generation through `nnc-gen -t mc2`, from raw queries in the `verification` section
 - Optional import/composition metadata for optimized Verilog generation
 
 ## Installation
@@ -42,6 +43,8 @@ Example:
 ```powershell
 nnc-sim examples/simple/example1.yaml input.csv output.csv
 ```
+
+IO-mode output contains only the output-variable columns. Add `--csv-include-step` to prepend a `step` column (the optional initial row is step `0`, after-step rows start at `1`), for example for MC2 traces.
 
 ### Compute mode
 - This mode does not consume CSV input.
@@ -79,7 +82,7 @@ The simulator supports standalone TENNCell YAML and import-composed TENNCell sys
 Use `nnc-gen` to generate backend-specific outputs:
 
 ```powershell
-nnc-gen <system_file.yaml> -t {python,verilog,webots} [options]
+nnc-gen <system_file.yaml> -t {python,verilog,webots,mc2} [options]
 ```
 
 Options:
@@ -116,6 +119,53 @@ Use this backend when you want TENNCell to drive a Webots robot or read its sens
 Example:
 ```powershell
 nnc-gen examples/webots/e_puck_pid/e_puck_pid.yaml -t webots
+```
+
+### MC2 verification backend
+`nnc-gen -t mc2` generates query files for the [MC2](https://people.brunel.ac.uk/~csstdrg/courses/glasgow_courses/website_sysbiomres/software/mc2/) Monte Carlo model checker (PLTLc).
+It does not run MC2. The queries come from raw entries under `verification.backends.mc2.raw`:
+
+```yaml
+verification:
+  backends:
+    mc2:
+      raw:
+        - id: reaches_done
+          code: "P=?[ F([${done}] = 1) ]"
+        - id: never_overflows
+          code: "P>=1[ G([${counter}] <= ${MAX_COUNT}) ]"
+```
+
+- Each entry is exactly one MC2 query on one line; use YAML folded style `code: >-` for long queries.
+- `${name}` placeholders are checked against the model: variables, constants, FSM states (`${ctrl.DONE}`), aliases, and imported inputs/outputs (`${sensor0.level}`). Unknown or ambiguous names are errors.
+- Placeholders render as bare names, so write the MC2 brackets yourself: `[${x}]`, `d[${x}]`, `max([${x}])`. Constants and FSM states render as numbers; imported IO renders as `alias__port`.
+- `$${` writes a literal `${`.
+
+For each root file, `nnc-gen -t mc2` writes three files:
+- `<stem>.mc2.pltl`: the MC2 queries, one per line;
+- `<stem>.mc2.ids`: the entry IDs, in the same order;
+- `<stem>.mc2.columns`: the trace columns the queries need.
+
+Generic `verification.properties` are parsed but not emitted yet; `nnc-gen` warns when it skips them.
+
+To check the queries, MC2 needs a trace whose **first column is time**, followed by every column in `.mc2.columns`. `nnc-sim` writes only output variables, so declare the variables your queries use as outputs (`nnc-gen -t mc2` warns about columns that are not outputs), and add the time column with `--csv-include-step`:
+
+```powershell
+nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
+nnc-sim examples/verification/fsm_counter_mc2.yaml start.csv out/trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "
+java -jar MC2v2.0beta2.jar stoch out/trace.txt out/fsm_counter_mc2.mc2.pltl
+```
+
+`--csv-delimiter` also applies to the input CSV. MC2 reads whitespace-separated traces by default; for `;`-separated traces add `-snoopy`. Use `stoch` mode even for a single deterministic run.
+
+MC2 v2.0beta2 query syntax, checked against the tool:
+- `^` is "and", uppercase `V` is "or", `->` or `=>` is "implies", and `¬` (U+00AC) is "not". `!`, `&`, `|`, and lowercase `v` are rejected; `!` only appears in `!=`.
+- `nnc-gen` writes query files in UTF-8. Java 18+ reads them correctly; with older Java use `java -Dfile.encoding=UTF-8 -jar ...` when queries contain `¬`.
+The full planned verification design is in `docs/verification.md`.
+
+Example:
+```powershell
+nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
 ```
 
 ### Verilog backend
@@ -540,6 +590,7 @@ The `verilog` backend emits SystemVerilog-style RTL:
 - Verilog generation uses the TENNCell model plus `verilog.real_encoding`, `verilog.ports`, `verilog.externals`, and TENNCell imports.
 - Webots generation uses the TENNCell model plus `webots.bindings` / `webots.init`.
 - Webots generation emits controller code only: one Python controller for the root YAML file, with no world, PROTO, or external RTL files.
+- MC2 generation uses the root TENNCell model plus its `verification` section and emits query, ID, and trace-column files only; it does not produce traces or run MC2.
 
 ## Examples
 
@@ -552,6 +603,7 @@ See `examples/` for:
 - Verilog composition examples in `examples/composition/verilog_composed/`
 - FPGA-oriented examples under `examples/fpga/`, including standalone `blink.yaml`, `blink_if.yaml`, and `ledwalk.yaml`, plus dedicated folders for `blink_uart/`, `blink_uart_typed/`, `sensor_controller/`, `fpga_uart_led/`, `fpga_spi_gpio_bridge/`, and `axii/`
 - Webots controller examples under `examples/webots/`, including `e_puck_pid/` and `pioneer3_dx_obstacle_avoidance/`
+- verification examples under `examples/verification/`, including `fsm_counter_mc2.yaml` for `nnc-gen -t mc2`
 
 ## Notes
 - Top-level `name` and `description` are treated as metadata and ignored by Verilog generation.

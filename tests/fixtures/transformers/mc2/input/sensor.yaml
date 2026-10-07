@@ -1,0 +1,14 @@
+# Imported sensor module for the MC2 transformer fixture.
+module:
+  name: sensor
+
+cells:
+  - id: 1
+    contents:
+      - raw = 0
+      - level = 0
+    input: [raw]
+    output: [level]
+
+rules:
+  - raw -> level

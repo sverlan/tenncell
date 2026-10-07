@@ -1,0 +1,24 @@
+# Root verification fixture whose MC2 raw entries and properties are split
+# across an included fragment and the root file.
+module:
+  name: include_main
+  include: checks.yaml
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verification:
+  properties:
+    - id: root_property
+      always: x >= 0
+  backends:
+    mc2:
+      raw:
+        - id: root_query
+          code: "P=?[ F([${x}] > 2) ]"

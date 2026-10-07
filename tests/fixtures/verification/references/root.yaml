@@ -1,0 +1,41 @@
+# Root module for verification reference tests: local variable, constant,
+# FSM state, alias to a variable, alias to imported IO, and an import.
+module:
+  name: references_root
+
+imports:
+  - module: sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+
+constants:
+  LIMIT: 2.5
+  COUNT: 4
+
+aliases:
+  current: sample
+  sensed: sensor0.level
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - mode = 0
+      - alarm = 0
+    input: [sample]
+    output: [alarm]
+
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: sensor0.level > LIMIT
+              then:
+                - ALERT -> mode
+      - ALERT:
+          rules:
+            - 1 -> alarm

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- Added the planned `verification` section parser and MC2 raw query generation through `nnc-gen -t mc2`.
+- Added MC2 query, ID, and trace-column file emission with placeholder validation against TENNCell model references.
+- Added IO-mode `nnc-sim --csv-include-step` support and documented the MC2 v2.0beta2 trace/query workflow.
+
 ## 0.7.3
 - Added CSV control options like `--csv-delimiter`
 - Added an include mechanism to include YAML fragments.

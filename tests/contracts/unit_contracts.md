@@ -12,6 +12,8 @@ should verify these promises, not internal implementation details.
 - `tests/unit_tests/transformers/python/` covers Python backend behavior.
 - `tests/unit_tests/transformers/verilog/` covers Verilog backend behavior.
 - `tests/unit_tests/transformers/webots/` covers Webots backend behavior.
+- `tests/unit_tests/transformers/mc2/` covers MC2 raw query generation.
+- `tests/unit_tests/verification/` covers verification section parsing, placeholders, and reference binding.
 - `tests/cli_tests/` covers CLI behavior and command-line contract.
 
 ## Core Model Contracts
@@ -38,7 +40,8 @@ should verify these promises, not internal implementation details.
 ## Transformer Contracts
 
 - `BaseTransformer` provides the shared output buffer workflow used by backends.
-- `nnc.transformers` exports `BaseTransformer`, `PythonTransformer`, `VerilogTransformer`, and `WebotsTransformer`.
+- `nnc.transformers` exports `BaseTransformer`, `Mc2Transformer`, `PythonTransformer`, `VerilogTransformer`, and `WebotsTransformer`.
+- `BaseTransformer.transform_files()` defaults to one file built from `transform()` and `get_file_extension()`.
 - `PythonTransformer` emits the standalone Python backend for a single TENNCell system.
 - Composed Python generation emits one file for the import closure and preserves module class structure.
 - Generated Python code keeps the current CSV command-line behavior.
@@ -53,6 +56,19 @@ should verify these promises, not internal implementation details.
 - FSM sugar is lowered into generated Verilog state logic and constants.
 - `WebotsTransformer` emits a standalone Python controller for Webots.
 - Webots generation requires a `webots` YAML section with bindings for declared TENNCell inputs and outputs.
+- `Mc2Transformer` emits `.mc2.pltl`, `.mc2.ids`, and `.mc2.columns` from `mc2.raw`, requires at least one raw entry, rejects empty or multi-line queries, and warns about skipped generic properties and about columns that are not root outputs.
+
+## Verification Contracts
+
+- `parse_verification_section()` returns `None` when the section is absent and a `VerificationConfig` otherwise.
+- Unknown keys, invalid `trace_semantics`, malformed `environment` entries, and reserved or unknown backend names are rejected with YAML file and line.
+- `native.raw` and `sva.raw` are rejected; `mc2.raw` entries require an identifier `id` and string `code`, and lose exactly one final newline.
+- Raw IDs are unique within `mc2.raw`; property IDs are unique among `properties`.
+- Generic properties are parsed only as stubs (`id`, `targets`).
+- Include merging concatenates `verification.properties` and `verification.backends.mc2.raw`, keeping source locations.
+- `parse_template()` splits raw code into text and `${name}` placeholders, handles `$${` escapes, and rejects unclosed, empty, or invalid placeholders.
+- `resolve_reference()` resolves variables, constants, FSM states, imported inputs/outputs, and aliases (to their target), and rejects unknown and ambiguous names.
+- `bind_verification()` rejects environment keys that are not root inputs and reports placeholder errors at the raw entry's YAML line.
 
 ## CLI Contracts
 
@@ -60,6 +76,8 @@ should verify these promises, not internal implementation details.
 - CLI failures do not abort the remaining inputs.
 - Exit status is `0` on full success and `1` when any file fails.
 - Invalid transformer types and missing files produce clear error messages.
+- `nnc-gen -t mc2` writes the three MC2 files with `--output-suffix`, prints transformer warnings to stderr, and continues the batch after an invalid file.
+- `nnc-sim --csv-include-step` prepends a `step` column to IO-mode CSV (initial row `0`, after-step rows from `1`); without it IO mode keeps output-only columns.
 
 ## Notes
 

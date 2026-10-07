@@ -133,3 +133,11 @@ class TestBaseTransformer:
         # Reset and verify
         transformer.reset()
         assert transformer.get_output() == ""
+
+
+def test_transform_files_defaults_to_single_file():
+    """The default multi-file API wraps transform() and get_file_extension()."""
+    transformer = ConcreteTransformer()
+
+    assert transformer.transform_files(NncSystem()) == {".test": "test output"}
+    assert transformer.warnings == []

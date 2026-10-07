@@ -1,0 +1,58 @@
+# Test-owned MC2 end-to-end fixture: every queried variable is an output so
+# that nnc-sim traces contain it. One query uses the MC2 negation sign.
+module:
+  name: fsm_counter
+
+constants:
+  MAX_COUNT: 3
+
+cells:
+  - id: 1
+    contents:
+      - ctrl_state = 0
+      - counter = 0
+      - start = 0
+      - done = 0
+    input: [start]
+    output: [counter, done, ctrl_state]
+
+fsm:
+  - name: ctrl
+    variable: ctrl_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: start > 0
+              then:
+                - RUN -> ctrl_state
+                - counter * 0 -> counter
+                - done * 0 -> done
+              else:
+                - done * 0 -> done
+      - RUN:
+          rules:
+            - if: counter >= MAX_COUNT
+              then:
+                - DONE -> ctrl_state
+                - 1 -> done
+              else:
+                - counter + 1 -> counter
+      - DONE:
+          rules:
+            - done -> done
+
+verification:
+  backends:
+    mc2:
+      raw:
+        - id: reaches_done
+          code: "P=?[ F([${done}] = 1) ]"
+        - id: never_overflows
+          code: "P>=1[ G([${counter}] <= ${MAX_COUNT}) ]"
+        - id: done_in_done_state
+          code: "P>=1[ G([${ctrl_state}] = ${ctrl.DONE} -> [${done}] = 1) ]"
+        - id: never_five
+          code: "P=?[ ¬F([${done}] = 5) ]"
+        - id: overflow_never_reached
+          code: "P=?[ F([${counter}] > ${MAX_COUNT}) ]"

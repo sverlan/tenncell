@@ -150,6 +150,47 @@ def test_io_mode_csv_options_apply_to_input_and_output():
     assert len(output.splitlines()) == 3
 
 
+def _run_io_mode(tmp_dir: Path, *options: str) -> list[str]:
+    input_file = (
+        Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "io_mode.yaml"
+    )
+    csv_input = tmp_dir / "input.csv"
+    csv_output = tmp_dir / "output.csv"
+    csv_input.write_text("u\n1.25\n2\n", encoding="utf-8")
+    with patch(
+        "sys.argv",
+        ["nnc-sim", str(input_file), str(csv_input), str(csv_output), *options],
+    ):
+        assert main() == 0
+    return csv_output.read_text(encoding="utf-8").splitlines()
+
+
+def test_io_mode_include_step_numbers_after_step_rows_from_one():
+    with TemporaryDirectory() as tmp_dir:
+        lines = _run_io_mode(Path(tmp_dir), "--csv-include-step")
+
+    assert lines[0] == "step,x,y,z"
+    assert [line.split(",")[0] for line in lines[1:]] == ["1", "2"]
+
+
+def test_io_mode_include_step_numbers_initial_row_zero():
+    with TemporaryDirectory() as tmp_dir:
+        lines = _run_io_mode(
+            Path(tmp_dir), "--csv-include-step", "--csv-include-initial"
+        )
+
+    assert lines[0] == "step,x,y,z"
+    assert [line.split(",")[0] for line in lines[1:]] == ["0", "1", "2"]
+
+
+def test_io_mode_without_include_step_keeps_output_only_columns():
+    with TemporaryDirectory() as tmp_dir:
+        lines = _run_io_mode(Path(tmp_dir))
+
+    assert lines[0] == "x,y,z"
+    assert len(lines) == 3
+
+
 def test_cli_returns_one_on_runtime_error():
     """Runtime errors should produce stderr output and exit code 1."""
     input_file = (

@@ -1,0 +1,12 @@
+# Module where one name is both a constant and a variable.
+constants:
+  x: 1
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x

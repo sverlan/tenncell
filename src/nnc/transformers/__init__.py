@@ -4,6 +4,7 @@ from importlib import import_module
 
 __all__ = [
     "BaseTransformer",
+    "Mc2Transformer",
     "PythonTransformer",
     "VerilogTransformer",
     "WebotsTransformer",
@@ -13,6 +14,8 @@ __all__ = [
 def __getattr__(name: str):
     if name == "BaseTransformer":
         return import_module(".base_transformer", __name__).BaseTransformer
+    if name == "Mc2Transformer":
+        return import_module(".mc2_transformer", __name__).Mc2Transformer
     if name == "PythonTransformer":
         return import_module(".python_transformer", __name__).PythonTransformer
     if name == "VerilogTransformer":

@@ -1,0 +1,8 @@
+# Included fragment with an unknown placeholder on line 8.
+verification:
+  backends:
+    mc2:
+      raw:
+        - id: fragment_query
+          description: References a name the model does not define
+          code: "P>=1[ G([${missing}] >= 0) ]"

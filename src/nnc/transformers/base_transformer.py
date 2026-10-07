@@ -9,6 +9,22 @@ class BaseTransformer(ABC):
 
     def __init__(self):
         self.output = []
+        self.warnings: list[str] = []
+
+    def transform_files(self, system: NncSystem) -> dict[str, str]:
+        """Transform a TENNCell system into one or more output files.
+
+        The default emits a single file using ``transform()`` and
+        ``get_file_extension()``. Backends that produce several files override it.
+
+        Args:
+            system: The TENNCell system to transform
+
+        Returns:
+            Mapping from file suffix (appended to the output base name) to
+            file content
+        """
+        return {self.get_file_extension(): self.transform(system)}
 
     @abstractmethod
     def transform(self, system: NncSystem) -> str:
