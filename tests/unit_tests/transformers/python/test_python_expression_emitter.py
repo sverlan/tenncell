@@ -34,10 +34,7 @@ class TestPythonExpressionEmitter:
         emitter = PythonTransformer()
 
         assert emitter._reference_code("value") == "self.value"
-        assert (
-            emitter._reference_code("sensor0.level")
-            == "self._ref('sensor0.level')"
-        )
+        assert emitter._reference_code("sensor0.level") == "self._ref('sensor0.level')"
 
     def test_get_producer_variables_handles_presence_and_absence(self):
         emitter = PythonTransformer()

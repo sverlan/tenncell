@@ -19,33 +19,25 @@ class NncSystem:
         """
         # TENNCell step using _new variables approach
 
-        # Step 1: Initialize _new versions of all variables from current state
-        left_position_new = self.left_position
-        left_speed_new = self.left_speed
-        right_position_new = self.right_position
-        right_speed_new = self.right_speed
-
-        # Step 2: Track variables consumed by active rules
+        # Step 1: Evaluate rules on the current state
         used_vars = set()
-
-        # Step 3: Evaluate active rules and collect consumed variables
         # Rule 1
-        left_speed_new += 1.0
+        _p0 = 1.0
 
         # Rule 2
-        right_speed_new += 2.0
+        _p1 = 2.0
 
-        # Step 4: Remove old values from dynamically used variables
-        if 'left_position' in used_vars:
-            left_position_new -= self.left_position
-        if 'left_speed' in used_vars:
-            left_speed_new -= self.left_speed
-        if 'right_position' in used_vars:
-            right_position_new -= self.right_position
-        if 'right_speed' in used_vars:
-            right_speed_new -= self.right_speed
+        # Step 2: Initialize _new versions of all variables from consumption state
+        left_position_new = 0.0 if 'left_position' in used_vars else self.left_position
+        left_speed_new = 0.0 if 'left_speed' in used_vars else self.left_speed
+        right_position_new = 0.0 if 'right_position' in used_vars else self.right_position
+        right_speed_new = 0.0 if 'right_speed' in used_vars else self.right_speed
 
-        # Step 5: Update all variables to their final values
+        # Step 3: Accumulate stored productions in rule order
+        left_speed_new += _p0
+        right_speed_new += _p1
+
+        # Step 4: Update all variables to their final values
         self.left_position = left_position_new
         self.left_speed = left_speed_new
         self.right_position = right_position_new

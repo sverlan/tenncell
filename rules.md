@@ -16,9 +16,17 @@
 - If any requested input file is missing or any file fails to transform, the command still attempts remaining files but exits with status code `1`.
 - If all requested files transform successfully, `nnc-gen` exits with status code `0`.
 - YAML loader and transformer errors should include the originating YAML file path and line number when the parser has source-location data.
+- Source locations are indexed by the same resolved keys as the loaded data (for example a key written `010` is indexed as `10`, `true` as `True`), so errors about such keys point to the key's own line.
 - Errors raised from imported YAML files must preserve the imported file path in the message.
 
 ## YAML Schema
+- Plain (unquoted) YAML values are resolved with YAML 1.2 core-schema rules, plus two YAML 1.1 number forms. This affects only how values are interpreted; YAML syntax is unchanged.
+  - `true`/`false` (any of `true True TRUE false False FALSE`) are booleans; `on`, `off`, `yes`, `no` in any capitalization are ordinary strings and can be used as names (for example FSM states `ON`/`OFF`).
+  - `null`, `Null`, `NULL`, `~`, and an empty value mean "no value".
+  - Integers are decimal (a leading zero is still decimal: `010` is 10), hexadecimal `0x...`, octal `0o...`, or binary `0b...`; underscores are allowed (`1_000`).
+  - A number with a decimal point or an exponent is a float (`1e5`, `1.5e-3`); `.inf`, `-.inf`, and `.nan` are floats.
+  - Dates, base-60 numbers such as `1:30`, and a bare `=` are ordinary strings.
+- Boolean settings accept only `true` or `false`; any other value, including the strings `"false"`, `no`, or `off`, is rejected with the YAML line. This applies to `module.zero_reset_mode`, the Verilog `signed` fields, and `webots.csv.include_step`/`include_time`/`include_initial`.
 - Standalone TENNCell YAML with top-level `cells` and `rules` remains valid.
 - Top-level `name` and `description` are metadata only. They are ignored by Verilog generation.
 - Optional top-level sections supported by the loader are:
@@ -191,7 +199,8 @@
 - The backend emits SystemVerilog-style RTL and writes one `.sv` file per TENNCell module in the import closure.
 - Multiple cells inside one YAML file are flattened into a single Verilog module.
 - The Verilog backend models consumption explicitly by zeroing used variables before accumulating productions.
-- The Python backend keeps dynamic consume/rewrite behavior through the current `+ production - old_value` formulation after evaluating active rules.
+- The Python backend evaluates each guard and active production once in rule order against the current state, records variables consumed by active productions, initializes consumed next-state variables to zero, and then accumulates the stored productions in rule order.
+- For the same inputs and deterministic expressions supported by the generated Python backend, generated Python `step()` produces results bitwise-identical to `NncSystem.step()`. Generated code must not use algebraically equivalent rewrites (such as adding productions to the old value and subtracting it afterwards) that change floating-point rounding.
 - When `module.zero_reset_mode` is enabled, both Python and Verilog backends switch that module to zero-initialize all next-state values each step instead of using dynamic consume tracking.
 - Imported TENNCell modules and external modules are instantiated structurally inside the generated Verilog module.
 - Each generated Verilog/SystemVerilog file begins with `` `default_nettype none`` and keeps it in effect throughout the generated file.
@@ -319,6 +328,15 @@
 - Existing standalone YAML files continue to work with the Python backend and simulator.
 - Imported TENNCell modules are supported by the Python backend and runtime simulator.
 - Python transformation emits one `.py` file for the full import closure, with internal helper classes plus one public root `NncSystem` wrapper.
+- Generated Python supports every default function of the `MathFunctions` registry:
+  - `pi` and `e` are emitted as `math.pi` and `math.e`;
+  - `math` functions are emitted as `math.<name>(...)`;
+  - `abs`, `min`, `max`, and `round` are emitted as Python built-ins;
+  - `random()` is emitted as `random.random()`, and `import random` is added only when it is used.
+- `random()` in generated Python is not seeded together with the simulator, so its draws are not expected to match `nnc-sim`.
+- Functions registered at runtime through `MathFunctions.register_function`, including overrides of default function names, are rejected at generation time with an error naming the function, the rule, and the source file. Generated files stay standalone and do not import `nnc`.
+- Python generation rejects documents with no model variables or semantic imports as having nothing to generate; this prevents external headers and include-only fragments from producing invalid empty classes.
+- Qualified FSM state references such as `ctrl.ACTIVE` resolve to the lowered FSM state constant (`ctrl__ACTIVE`) in generated Python, as in the simulator and Verilog backend.
 - Python composition executes imports in dependency order and keeps current float semantics at module boundaries.
 - Generated Python scripts use the same CSV command-line behavior for standalone and composed systems.
 - Generated Python scripts with input variables read CSV rows from standard input until exhaustion, do not require a `steps` argument, and exit with status `1` if a required input column is missing.

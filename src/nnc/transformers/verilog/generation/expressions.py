@@ -88,9 +88,7 @@ class VerilogExpressionEmitter:
         """Reject unsupported TENNCell node types during Verilog emission."""
         raise ValueError(f"Unsupported Verilog node type: {type(node).__name__}")
 
-    def _module_encoding(
-        self, ctx: VerilogEmissionContext
-    ) -> VerilogEncoding:
+    def _module_encoding(self, ctx: VerilogEmissionContext) -> VerilogEncoding:
         """Return the encoding used by the current Verilog module."""
         enc = ctx.config.real_encoding
         assert enc is not None

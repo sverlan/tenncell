@@ -51,9 +51,15 @@ def _expand_items(
     for index, item in enumerate(items):
         item_path = (*path, index)
         if _is_repeat_item(item):
-            expanded.extend(_expand_repeat_item(item["repeat"], locations, item_path, bindings))
+            expanded.extend(
+                _expand_repeat_item(item["repeat"], locations, item_path, bindings)
+            )
         else:
-            expanded.append(ExpandedRepeatItem(_substitute(item, bindings, locations, item_path), item_path))
+            expanded.append(
+                ExpandedRepeatItem(
+                    _substitute(item, bindings, locations, item_path), item_path
+                )
+            )
     return expanded
 
 
@@ -73,18 +79,34 @@ def _expand_repeat_item(
     unknown_keys = set(repeat_data.keys()) - allowed_keys
     if unknown_keys:
         unknown = sorted(unknown_keys)[0]
-        raise _error(locations, f"repeat has unsupported field '{unknown}'", (*repeat_path, "repeat", unknown))
+        raise _error(
+            locations,
+            f"repeat has unsupported field '{unknown}'",
+            (*repeat_path, "repeat", unknown),
+        )
 
     var_name = repeat_data.get("var")
     if not isinstance(var_name, str) or not _VAR_RE.fullmatch(var_name):
-        raise _error(locations, "repeat.var must be a valid placeholder name", (*repeat_path, "repeat", "var"))
+        raise _error(
+            locations,
+            "repeat.var must be a valid placeholder name",
+            (*repeat_path, "repeat", "var"),
+        )
     if var_name in bindings:
-        raise _error(locations, f"repeat variable '{var_name}' shadows an active repeat variable", (*repeat_path, "repeat", "var"))
+        raise _error(
+            locations,
+            f"repeat variable '{var_name}' shadows an active repeat variable",
+            (*repeat_path, "repeat", "var"),
+        )
 
-    values = _range_values(repeat_data.get("range"), locations, (*repeat_path, "repeat", "range"))
+    values = _range_values(
+        repeat_data.get("range"), locations, (*repeat_path, "repeat", "range")
+    )
     body = repeat_data.get("body")
     if not isinstance(body, list):
-        raise _error(locations, "repeat.body must be a list", (*repeat_path, "repeat", "body"))
+        raise _error(
+            locations, "repeat.body must be a list", (*repeat_path, "repeat", "body")
+        )
 
     expanded: list[ExpandedRepeatItem] = []
     for value in values:
@@ -105,8 +127,12 @@ def _range_values(
     path: tuple[object, ...],
 ) -> list[int]:
     if not isinstance(raw_range, list) or len(raw_range) not in {2, 3}:
-        raise _error(locations, "repeat.range must be [start, end] or [start, end, step]", path)
-    if not all(isinstance(value, int) and not isinstance(value, bool) for value in raw_range):
+        raise _error(
+            locations, "repeat.range must be [start, end] or [start, end, step]", path
+        )
+    if not all(
+        isinstance(value, int) and not isinstance(value, bool) for value in raw_range
+    ):
         raise _error(locations, "repeat.range values must be integers", path)
 
     start = raw_range[0]
@@ -115,11 +141,17 @@ def _range_values(
     if step == 0:
         raise _error(locations, "repeat.range step cannot be zero", path)
     if start < end and step < 0:
-        raise _error(locations, "repeat.range step must be positive for ascending ranges", path)
+        raise _error(
+            locations, "repeat.range step must be positive for ascending ranges", path
+        )
     if start > end and step > 0:
-        raise _error(locations, "repeat.range step must be negative for descending ranges", path)
+        raise _error(
+            locations, "repeat.range step must be negative for descending ranges", path
+        )
     if (end - start) % step != 0:
-        raise _error(locations, "repeat.range end must be reached exactly by step", path)
+        raise _error(
+            locations, "repeat.range end must be reached exactly by step", path
+        )
     return list(range(start, end + (1 if step > 0 else -1), step))
 
 

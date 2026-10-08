@@ -11,14 +11,20 @@ if TYPE_CHECKING:
     from .context import VerilogEmissionContext
 
 
-def fixed_storage_decl(emitter: VerilogConversionEmitter, width: int, signed: bool) -> str:
+def fixed_storage_decl(
+    emitter: VerilogConversionEmitter, width: int, signed: bool
+) -> str:
     """Return the Verilog storage declaration for a fixed-point signal."""
     sign = " signed" if signed else ""
     return f"logic{sign} [{width - 1}:0]"
 
 
 def encode_float(
-    emitter: VerilogConversionEmitter, value: float, width: int, frac_bits: int, signed: bool
+    emitter: VerilogConversionEmitter,
+    value: float,
+    width: int,
+    frac_bits: int,
+    signed: bool,
 ) -> str:
     """Encode a floating-point literal using the configured fixed-point format."""
     scaled = int(round(value * (2**frac_bits)))

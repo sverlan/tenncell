@@ -34,7 +34,8 @@ class PythonCsvScriptEmitter:
         self.add_line()
 
         self.add_line(
-            "parser = argparse.ArgumentParser(description='TENNCell System Simulator')", 1
+            "parser = argparse.ArgumentParser(description='TENNCell System Simulator')",
+            1,
         )
         self.add_line(
             "parser.add_argument('--csv-include-initial', action='store_true', "
@@ -68,7 +69,9 @@ class PythonCsvScriptEmitter:
 
         self.add_line("system = NncSystem()", 1)
         self.add_line("if args.csv_delimiter == '':", 1)
-        self.add_line("print('Error: --csv-delimiter must be non-empty', file=sys.stderr)", 2)
+        self.add_line(
+            "print('Error: --csv-delimiter must be non-empty', file=sys.stderr)", 2
+        )
         self.add_line("sys.exit(1)", 2)
         self.add_line(
             "if args.csv_precision is not None and args.csv_precision < 0:", 1

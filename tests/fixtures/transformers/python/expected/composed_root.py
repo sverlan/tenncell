@@ -29,25 +29,20 @@ class _Module_sensor(_NncModuleBase):
 
         # TENNCell step using _new variables approach
 
-        # Step 1: Initialize _new versions of all variables from current state
-        level_new = self.level
-        raw_new = self.raw
-
-        # Step 2: Track variables consumed by active rules
+        # Step 1: Evaluate rules on the current state
         used_vars = set()
-
-        # Step 3: Evaluate active rules and collect consumed variables
         # Rule 1
-        level_new += (self.raw + 1.0)
+        _p0 = (self.raw + 1.0)
         used_vars.add('raw')
 
-        # Step 4: Remove old values from dynamically used variables
-        if 'level' in used_vars:
-            level_new -= self.level
-        if 'raw' in used_vars:
-            raw_new -= self.raw
+        # Step 2: Initialize _new versions of all variables from consumption state
+        level_new = 0.0 if 'level' in used_vars else self.level
+        raw_new = 0.0 if 'raw' in used_vars else self.raw
 
-        # Step 5: Update all variables to their final values
+        # Step 3: Accumulate stored productions in rule order
+        level_new += _p0
+
+        # Step 4: Update all variables to their final values
         self.level = level_new
         self.raw = raw_new
 
@@ -78,25 +73,22 @@ class _Module_controller(_NncModuleBase):
 
         # TENNCell step using _new variables approach
 
-        # Step 1: Initialize _new versions of all variables from current state
-        alarm_new = self.alarm
-        sample_new = self.sample
-
-        # Step 2: Track variables consumed by active rules
+        # Step 1: Evaluate rules on the current state
         used_vars = set()
-
-        # Step 3: Evaluate active rules and collect consumed variables
         # Rule 1
-        if (self._ref('sensor0.level') > 2.0):
-            alarm_new += self._ref('sensor0.level')
+        _g0 = (self._ref('sensor0.level') > 2.0)
+        if _g0:
+            _p0 = self._ref('sensor0.level')
 
-        # Step 4: Remove old values from dynamically used variables
-        if 'alarm' in used_vars:
-            alarm_new -= self.alarm
-        if 'sample' in used_vars:
-            sample_new -= self.sample
+        # Step 2: Initialize _new versions of all variables from consumption state
+        alarm_new = 0.0 if 'alarm' in used_vars else self.alarm
+        sample_new = 0.0 if 'sample' in used_vars else self.sample
 
-        # Step 5: Update all variables to their final values
+        # Step 3: Accumulate stored productions in rule order
+        if _g0:
+            alarm_new += _p0
+
+        # Step 4: Update all variables to their final values
         self.alarm = alarm_new
         self.sample = sample_new
 

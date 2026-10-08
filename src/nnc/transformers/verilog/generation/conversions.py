@@ -53,7 +53,11 @@ def conversion_helper_name(
 
 
 def conversion_descriptor(
-    emitter: VerilogConversionEmitter, kind: str, width: int, signed: bool, frac_bits: int
+    emitter: VerilogConversionEmitter,
+    kind: str,
+    width: int,
+    signed: bool,
+    frac_bits: int,
 ) -> str:
     """Return a short descriptor used in generated helper names."""
     sign = "s" if signed else "u"
@@ -64,7 +68,9 @@ def conversion_descriptor(
     return f"logic_{width}"
 
 
-def type_decl(emitter: VerilogConversionEmitter, kind: str, width: int, signed: bool) -> str:
+def type_decl(
+    emitter: VerilogConversionEmitter, kind: str, width: int, signed: bool
+) -> str:
     """Return the Verilog type declaration for a signal kind."""
     if kind == "logic":
         if width == 1:

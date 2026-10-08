@@ -1,0 +1,50 @@
+# Two FSMs where the second one's guards use the first one's qualified states
+# (`mode.RUNNING`, `mode.STOPPED`); those references resolve to FSM state constants.
+module:
+  name: fsm_cross_reference
+
+cells:
+  - id: 1
+    contents:
+      - mode_state = 0
+      - blink_state = 0
+      - go = 0
+      - halt = 0
+      - out = 0
+    input: [go, halt]
+    output: [out]
+
+fsm:
+  - name: mode
+    variable: mode_state
+    initial: STOPPED
+    states:
+      - STOPPED:
+          rules:
+            - if: go > 0.5
+              then: RUNNING -> mode_state
+      - RUNNING:
+          rules:
+            - if: halt > 0.5
+              then: STOPPED -> mode_state
+
+  - name: blink
+    variable: blink_state
+    initial: LOW
+    states:
+      - LOW:
+          rules:
+            - if: mode_state == mode.RUNNING
+              then:
+                - HIGH -> blink_state
+                - out * 0 + 0.055 -> out
+              else:
+                - out * 0 -> out
+      - HIGH:
+          rules:
+            - if: mode_state == mode.STOPPED
+              then:
+                - LOW -> blink_state
+                - out * 0 -> out
+              else:
+                - out * 0 + 0.1 -> out

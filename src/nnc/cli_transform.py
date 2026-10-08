@@ -286,9 +286,7 @@ def _parse_verification_configs(
         if system.source_path is None:
             raise ValueError("MC2 export requires systems loaded from YAML files")
         data = raw_data_cache[system.source_path]
-        locations = system.source_locations or YamlLocationIndex(
-            system.source_path, {}
-        )
+        locations = system.source_locations or YamlLocationIndex(system.source_path, {})
         context = YamlSectionContext(
             source_path=system.source_path,
             import_paths=[],

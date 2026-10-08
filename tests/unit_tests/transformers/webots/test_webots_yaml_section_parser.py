@@ -117,14 +117,38 @@ def test_parse_webots_section_parses_initial_csv_logging():
 @pytest.mark.parametrize(
     ("fixture", "message"),
     [
-        ("invalid_csv.yaml", r"invalid_csv\.yaml:2: webots\.csv must be a mapping if provided"),
-        ("invalid_csv_file.yaml", r"invalid_csv_file\.yaml:3: webots\.csv\.file must be a string"),
-        ("invalid_csv_variables.yaml", r"invalid_csv_variables\.yaml:4: webots\.csv\.variables must be a list of strings"),
-        ("invalid_csv_include_step.yaml", r"invalid_csv_include_step\.yaml:5: webots\.csv\.include_step must be a boolean if provided"),
-        ("invalid_csv_include_time.yaml", r"invalid_csv_include_time\.yaml:5: webots\.csv\.include_time must be a boolean if provided"),
-        ("invalid_csv_include_initial.yaml", r"invalid_csv_include_initial\.yaml:5: webots\.csv\.include_initial must be a boolean if provided"),
-        ("invalid_csv_delimiter.yaml", r"invalid_csv_delimiter\.yaml:5: webots\.csv\.delimiter must be a non-empty string"),
-        ("invalid_csv_precision.yaml", r"invalid_csv_precision\.yaml:5: webots\.csv\.precision must be a non-negative integer or null"),
+        (
+            "invalid_csv.yaml",
+            r"invalid_csv\.yaml:2: webots\.csv must be a mapping if provided",
+        ),
+        (
+            "invalid_csv_file.yaml",
+            r"invalid_csv_file\.yaml:3: webots\.csv\.file must be a string",
+        ),
+        (
+            "invalid_csv_variables.yaml",
+            r"invalid_csv_variables\.yaml:4: webots\.csv\.variables must be a list of strings",
+        ),
+        (
+            "invalid_csv_include_step.yaml",
+            r"invalid_csv_include_step\.yaml:5: webots\.csv\.include_step must be a boolean if provided",
+        ),
+        (
+            "invalid_csv_include_time.yaml",
+            r"invalid_csv_include_time\.yaml:5: webots\.csv\.include_time must be a boolean if provided",
+        ),
+        (
+            "invalid_csv_include_initial.yaml",
+            r"invalid_csv_include_initial\.yaml:5: webots\.csv\.include_initial must be a boolean if provided",
+        ),
+        (
+            "invalid_csv_delimiter.yaml",
+            r"invalid_csv_delimiter\.yaml:5: webots\.csv\.delimiter must be a non-empty string",
+        ),
+        (
+            "invalid_csv_precision.yaml",
+            r"invalid_csv_precision\.yaml:5: webots\.csv\.precision must be a non-negative integer or null",
+        ),
     ],
 )
 def test_parse_webots_section_rejects_invalid_csv(fixture, message):

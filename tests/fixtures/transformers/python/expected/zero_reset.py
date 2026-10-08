@@ -26,15 +26,18 @@ class NncSystem:
 
         # TENNCell step using _new variables approach
 
-        # Step 1: Initialize _new versions of all variables from zero state
+        # Step 1: Evaluate rules on the current state
+        # Rule 1
+        _p0 = (self.trigger + 1.0)
+
+        # Step 2: Initialize _new versions of all variables from zero state
         out_new = 0.0
         trigger_new = self.trigger
 
-        # Step 2: Evaluate active rules and accumulate productions
-        # Rule 1
-        out_new += (self.trigger + 1.0)
+        # Step 3: Accumulate stored productions in rule order
+        out_new += _p0
 
-        # Step 3: Update all variables to their final values
+        # Step 4: Update all variables to their final values
         self.out = out_new
         self.trigger = trigger_new
 

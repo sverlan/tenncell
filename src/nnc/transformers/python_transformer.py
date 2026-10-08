@@ -34,6 +34,8 @@ class PythonTransformer(
         """
         try:
             self.reset()
+            self._current_system = None
+            self._uses_random = False
             ctx = PythonEmissionContext(
                 system=system,
                 composed_mode=bool(getattr(system, "imports", [])),
@@ -51,7 +53,14 @@ class PythonTransformer(
             self.add_line("class NncSystem:")
             self.add_line("def __init__(self):", 1)
 
-            self._emit_variable_initializers(system, 2, track_declarations=True, ctx=ctx)
+            emitted_init = self._emit_variable_initializers(
+                system, 2, track_declarations=True, ctx=ctx
+            )
+            if not emitted_init:
+                raise ValueError(
+                    "Python generation requires at least one model variable or "
+                    "semantic import; nothing to generate"
+                )
 
             input_vars = self._input_vars(system)
             output_vars = self._output_vars(system)
@@ -80,6 +89,7 @@ class PythonTransformer(
                 self.add_line()
                 self._emit_main_function(system)
 
+            self._add_random_import()
             return self.get_output()
         except Exception as error:
             raise as_yaml_located_error(
@@ -113,6 +123,7 @@ class PythonTransformer(
 
             if include_main:
                 self._emit_main_function(system)
+            self._add_random_import()
             return self.get_output()
         except Exception as error:
             raise as_yaml_located_error(
@@ -120,6 +131,11 @@ class PythonTransformer(
                 getattr(system, "source_path", None),
                 self._source_line(system),
             ) from error
+
+    def _add_random_import(self) -> None:
+        """Add ``import random`` after ``import math`` when ``random()`` was emitted."""
+        if self._uses_random:
+            self.output.insert(self.output.index("import math") + 1, "import random")
 
     def _collect_class_names(
         self, system: NncSystem, ctx: PythonEmissionContext | None = None

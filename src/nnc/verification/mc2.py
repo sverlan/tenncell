@@ -56,9 +56,7 @@ def render_literal(value: float) -> str:
     return format(Decimal(repr(value)), "f")
 
 
-def render_mc2(
-    bound: BoundVerification, locations: YamlLocationIndex
-) -> Mc2Artifacts:
+def render_mc2(bound: BoundVerification, locations: YamlLocationIndex) -> Mc2Artifacts:
     """Render the bound ``mc2`` raw entries.
 
     Args:

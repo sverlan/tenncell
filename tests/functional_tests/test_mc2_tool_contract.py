@@ -58,7 +58,16 @@ def test_mc2_checks_generated_queries_on_simulated_trace(tmp_path, delimiter, op
     queries, trace = _generate_and_trace(tmp_path, delimiter)
 
     result = subprocess.run(
-        ["java", "-jar", str(MC2_JAR), "stoch", str(trace), str(queries), *options, "-quiet"],
+        [
+            "java",
+            "-jar",
+            str(MC2_JAR),
+            "stoch",
+            str(trace),
+            str(queries),
+            *options,
+            "-quiet",
+        ],
         capture_output=True,
         text=True,
         timeout=60,
@@ -66,4 +75,6 @@ def test_mc2_checks_generated_queries_on_simulated_trace(tmp_path, delimiter, op
     )
 
     # Query order matches fsm_counter.mc2.ids.
-    assert result.stdout.strip() == "1.0,true,true,1.0,0.0", result.stdout + result.stderr
+    assert result.stdout.strip() == "1.0,true,true,1.0,0.0", (
+        result.stdout + result.stderr
+    )

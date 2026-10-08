@@ -71,8 +71,7 @@ class Mc2Transformer(BaseTransformer):
         bound = self._config_for(system)
         if bound is None or not bound.raw.get("mc2"):
             raise ValueError(
-                "No MC2 raw verification entries found "
-                "(verification.backends.mc2.raw)"
+                "No MC2 raw verification entries found (verification.backends.mc2.raw)"
             )
         locations = system.source_locations or YamlLocationIndex(
             _source_path(system), {}

@@ -10,7 +10,9 @@ from .webots_config import WebotsBindingConfig, WebotsConfig, WebotsCsvConfig
 
 def _field_location(context: YamlSectionContext, *path: object):
     """Return origin-aware source and line for wrapping plain exceptions."""
-    location = context.locations.location_for(*path) or context.locations.location_under(*path)
+    location = context.locations.location_for(
+        *path
+    ) or context.locations.location_under(*path)
     if location is None:
         return context.source_path, None
     return location.source_path, location.line

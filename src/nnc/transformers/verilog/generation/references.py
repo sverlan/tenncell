@@ -194,7 +194,11 @@ def convert_local_fixed_to_target(
     signal = emitter._state_name(signal_name)
     enc = ctx.config.real_encoding
     assert enc is not None
-    if target_kind == "fixed" and target_width == enc.width and target_signed == enc.signed:
+    if (
+        target_kind == "fixed"
+        and target_width == enc.width
+        and target_signed == enc.signed
+    ):
         return signal
     helper_name = emitter._conversion_helper_name(
         "fixed",
@@ -255,7 +259,9 @@ def external_output_to_target(
 
 
 def reference_encoding(
-    emitter: VerilogReferenceResolver, reference: str, ctx: VerilogEmissionContext | None = None
+    emitter: VerilogReferenceResolver,
+    reference: str,
+    ctx: VerilogEmissionContext | None = None,
 ) -> VerilogEncoding:
     """Return the encoding object for a TENNCell or boundary reference."""
     ctx = ctx or emitter._emission_context
@@ -298,7 +304,10 @@ def reference_encoding(
             if imported_name in item.system.output_variables:
                 imported_config = emitter._config_for(item.system)
                 imported_ports = {
-                    p.name: p for p in (imported_config.ports or emitter._infer_ports(item.system))
+                    p.name: p
+                    for p in (
+                        imported_config.ports or emitter._infer_ports(item.system)
+                    )
                 }
                 imported_port = imported_ports.get(imported_name, port)
                 if imported_port.kind == "fixed":

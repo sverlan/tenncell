@@ -36,7 +36,10 @@ def root_system():
             "ctrl__IDLE",
             ResolvedReference("ctrl__IDLE", "constant", "ctrl__IDLE", value=0.0),
         ),
-        ("sensor0.level", ResolvedReference("sensor0.level", "imported", "sensor0.level")),
+        (
+            "sensor0.level",
+            ResolvedReference("sensor0.level", "imported", "sensor0.level"),
+        ),
         ("sensor0.raw", ResolvedReference("sensor0.raw", "imported", "sensor0.raw")),
         (
             "current",
@@ -134,12 +137,12 @@ def _write_model(tmp_path: Path, verification: str) -> Path:
         ),
         (
             "verification:\n  backends:\n    mc2:\n      raw:\n"
-            "        - id: q\n          code: \"F([${y}] > 0)\"\n",
+            '        - id: q\n          code: "F([${y}] > 0)"\n',
             r"model\.yaml:15: Raw entry 'q': Unknown reference '\$\{y\}'",
         ),
         (
             "verification:\n  backends:\n    mc2:\n      raw:\n"
-            "        - id: q\n          code: \"F([${x] > 0)\"\n",
+            '        - id: q\n          code: "F([${x] > 0)"\n',
             r"model\.yaml:15: Raw entry 'q': Unclosed placeholder at offset 3",
         ),
     ],
@@ -169,6 +172,8 @@ def test_binding_errors_in_included_fragments_point_to_the_fragment():
 
 def test_binding_accepts_root_input_environment(tmp_path):
     bound = _bind(
-        _write_model(tmp_path, "verification:\n  environment:\n    u: { range: [0, 1] }\n")
+        _write_model(
+            tmp_path, "verification:\n  environment:\n    u: { range: [0, 1] }\n"
+        )
     )
     assert bound.raw == {}

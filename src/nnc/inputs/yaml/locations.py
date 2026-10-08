@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
+from yaml.nodes import MappingNode, Node, SequenceNode
 
 from .lexical import sanitize_bang_prefixed_scalars
+from .yaml_schema import TenncellYamlLoader
 
 
 @dataclass(slots=True)
@@ -88,10 +89,16 @@ class YamlLocationIndex:
 
 
 def _node_key(node: Node) -> object:
-    """Convert a YAML node used as a mapping key into a hashable path element."""
-    if isinstance(node, ScalarNode):
-        return node.value
-    return yaml.safe_load(yaml.serialize(node))
+    """Convert a YAML mapping-key node into the same value the loaded data uses.
+
+    Keys are resolved with the TENNCell loader, so ``010``, ``true`` and ``null``
+    index locations as ``10``, ``True`` and ``None``, matching the parsed data.
+    """
+    loader = TenncellYamlLoader("")
+    try:
+        return loader.construct_object(node, deep=True)
+    finally:
+        loader.dispose()
 
 
 def collect_yaml_locations(node: Node | None) -> dict[tuple[object, ...], int]:
@@ -127,8 +134,8 @@ def load_yaml_data_and_locations(
     """Load YAML content and collect path-to-line metadata for the document."""
     with source_path.open("r", encoding="utf-8") as file:
         sanitized = sanitize_bang_prefixed_scalars(file)
-    node = yaml.compose(sanitized)
-    data = yaml.safe_load(sanitized) or {}
+    node = yaml.compose(sanitized, Loader=TenncellYamlLoader)
+    data = yaml.load(sanitized, Loader=TenncellYamlLoader) or {}
     return data, YamlLocationIndex(source_path, collect_yaml_locations(node))
 
 

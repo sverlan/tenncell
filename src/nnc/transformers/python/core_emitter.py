@@ -4,6 +4,7 @@ from pathlib import Path
 
 from ...model.system import NncSystem
 from .emission_context import PythonEmissionContext
+from .expression_emitter import UnsupportedFunctionError
 
 
 class PythonCoreEmitter:
@@ -165,35 +166,19 @@ class PythonCoreEmitter:
         """Emit the body of the generated `step()` method."""
         ctx = ctx or self._emission_context
         zero_reset_mode = self._zero_reset_mode(system)
-        step_mode_label = "zero" if zero_reset_mode else "current"
-        self.add_line(
-            f"# Step 1: Initialize _new versions of all variables from {step_mode_label} state",
-            indent,
-        )
-        for var_name in var_names:
-            if zero_reset_mode and var_name not in input_vars:
-                self.add_line(f"{var_name}_new = 0.0", indent)
-            else:
-                self.add_line(f"{var_name}_new = self.{var_name}", indent)
-        self.add_line()
-
+        # Qualified FSM states (``fsm.STATE``) resolve against this system's constants.
+        self._current_system = system
+        self.add_line("# Step 1: Evaluate rules on the current state", indent)
         if not zero_reset_mode:
-            self.add_line("# Step 2: Track variables consumed by active rules", indent)
             self.add_line("used_vars = set()", indent)
-            self.add_line()
-
-        if zero_reset_mode:
-            self.add_line(
-                "# Step 2: Evaluate active rules and accumulate productions", indent
-            )
-        else:
-            self.add_line(
-                "# Step 3: Evaluate active rules and collect consumed variables", indent
-            )
+        emitted_rules: list[tuple[str, bool]] = []
         for i, rule in enumerate(system.rules):
             self.add_line(f"# Rule {i + 1}", indent)
-            guard_code = self.visit(rule.guard)
-            producer_code = self.visit(rule.producer)
+            try:
+                guard_code = self.visit(rule.guard)
+                producer_code = self.visit(rule.producer)
+            except UnsupportedFunctionError as error:
+                raise UnsupportedFunctionError(f"{error} (rule: {rule})") from error
             consumer_name = (
                 rule.consumer.name
                 if hasattr(rule.consumer, "name")
@@ -201,28 +186,41 @@ class PythonCoreEmitter:
             )
             producer_vars = sorted(self._get_producer_variables(rule.producer))
             body_indent = indent
-            if guard_code not in {"True", "1"}:
-                self.add_line(f"if {guard_code}:", indent)
+            unconditional = guard_code in {"True", "1"}
+            emitted_rules.append((consumer_name, unconditional))
+            if not unconditional:
+                self.add_line(f"_g{i} = {guard_code}", indent)
+                self.add_line(f"if _g{i}:", indent)
                 body_indent += 1
-            self.add_line(f"{consumer_name}_new += {producer_code}", body_indent)
+            self.add_line(f"_p{i} = {producer_code}", body_indent)
             if not zero_reset_mode:
                 for var_name in producer_vars:
                     self.add_line(f"used_vars.add('{var_name}')", body_indent)
             self.add_line()
 
-        if not zero_reset_mode:
-            self.add_line(
-                "# Step 4: Remove old values from dynamically used variables", indent
-            )
-            for var_name in var_names:
-                self.add_line(f"if '{var_name}' in used_vars:", indent)
-                self.add_line(f"{var_name}_new -= self.{var_name}", indent + 1)
-            self.add_line()
-
-        final_step = 3 if zero_reset_mode else 5
+        step_mode_label = "zero" if zero_reset_mode else "consumption"
         self.add_line(
-            f"# Step {final_step}: Update all variables to their final values", indent
+            f"# Step 2: Initialize _new versions of all variables from {step_mode_label} state",
+            indent,
         )
+        for var_name in var_names:
+            if zero_reset_mode:
+                initial_value = f"self.{var_name}" if var_name in input_vars else "0.0"
+            else:
+                initial_value = f"0.0 if '{var_name}' in used_vars else self.{var_name}"
+            self.add_line(f"{var_name}_new = {initial_value}", indent)
+        self.add_line()
+
+        self.add_line("# Step 3: Accumulate stored productions in rule order", indent)
+        for i, (consumer_name, unconditional) in enumerate(emitted_rules):
+            if unconditional:
+                self.add_line(f"{consumer_name}_new += _p{i}", indent)
+            else:
+                self.add_line(f"if _g{i}:", indent)
+                self.add_line(f"{consumer_name}_new += _p{i}", indent + 1)
+        self.add_line()
+
+        self.add_line("# Step 4: Update all variables to their final values", indent)
         for var_name in var_names:
             self.add_line(f"self.{var_name} = {var_name}_new", indent)
         self.add_line()

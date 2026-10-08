@@ -30,9 +30,7 @@ def _require_mapping(raw: dict | None, section_name: str) -> dict:
     return raw
 
 
-def _field_line(
-    locations: YamlLocationIndex | None, *path: object
-) -> int | None:
+def _field_line(locations: YamlLocationIndex | None, *path: object) -> int | None:
     """Look up the most specific available line for a YAML field."""
     if locations is None:
         return None
@@ -45,9 +43,7 @@ def _field_line(
     return locations.line_for(*path[:1])
 
 
-def _field_source(
-    locations: YamlLocationIndex | None, *path: object
-) -> Path | None:
+def _field_source(locations: YamlLocationIndex | None, *path: object) -> Path | None:
     """Look up the most specific available source file for a YAML field."""
     if locations is None:
         return None
@@ -78,6 +74,21 @@ def _raise_field_error(
     )
 
 
+def _signed_field(
+    data: dict,
+    label: str,
+    locations: YamlLocationIndex | None,
+    *path: object,
+) -> bool:
+    """Return the ``signed`` flag, which must be a YAML boolean (default false)."""
+    value = data.get("signed", False)
+    if not isinstance(value, bool):
+        _raise_field_error(
+            f"{label} 'signed' must be true or false", locations, *path, "signed"
+        )
+    return value
+
+
 def parse_real_encoding(
     raw: dict | None,
     locations: YamlLocationIndex | None = None,
@@ -96,7 +107,9 @@ def parse_real_encoding(
         )
     return RealEncoding(
         kind=data["kind"],
-        signed=data["signed"],
+        signed=_signed_field(
+            data, "verilog.real_encoding", locations, "verilog", "real_encoding"
+        ),
         width=data["width"],
         frac_bits=data["frac_bits"],
     )
@@ -121,7 +134,7 @@ def _parse_port_item(
         dir=data["direction"],
         kind=data.get("kind", "logic"),
         width=data.get("width", 1),
-        signed=data.get("signed", False),
+        signed=_signed_field(data, f"verilog port '{name}'", locations, *path),
         rename=data.get("rename"),
     )
 
@@ -153,7 +166,7 @@ def _parse_type_item(
         return VerilogLogicTypeInfo(
             kind="logic",
             width=data["width"],
-            signed=data.get("signed", False),
+            signed=_signed_field(data, f"verilog.types '{name}'", locations, *path),
         )
     if kind == "fixed_point":
         missing = [key for key in ("width", "frac_bits") if key not in data]
@@ -168,7 +181,7 @@ def _parse_type_item(
             kind="fixed_point",
             width=data["width"],
             frac_bits=data["frac_bits"],
-            signed=data.get("signed", False),
+            signed=_signed_field(data, f"verilog.types '{name}'", locations, *path),
         )
     _raise_field_error(
         f"verilog.types entry '{name}' has unsupported kind '{kind}'",
@@ -191,11 +204,7 @@ def parse_types(
     data = _require_mapping(raw_types, "types")
     for name, item in data.items():
         types[name] = _parse_type_item(name, item, locations, *path, name)
-        lines[name] = (
-            locations.line_for(*path, name)
-            if locations is not None
-            else None
-        )
+        lines[name] = locations.line_for(*path, name) if locations is not None else None
     return types, lines
 
 
@@ -208,9 +217,7 @@ def parse_ports(
     ports = []
     if isinstance(raw_ports, dict):
         for name, item in raw_ports.items():
-            ports.append(
-                _parse_port_item(name, item, locations, *path, name)
-            )
+            ports.append(_parse_port_item(name, item, locations, *path, name))
         return ports
 
     for index, item in enumerate(raw_ports or []):

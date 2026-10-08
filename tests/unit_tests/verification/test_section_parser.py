@@ -17,7 +17,9 @@ from nnc.verification import (
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "verification"
 
 
-def _context(path: Path, data: dict, locations: YamlLocationIndex) -> YamlSectionContext:
+def _context(
+    path: Path, data: dict, locations: YamlLocationIndex
+) -> YamlSectionContext:
     return YamlSectionContext(
         source_path=path,
         import_paths=[],
@@ -155,6 +157,13 @@ verification:
         (
             "verification:\n  environment:\n    true: { range: [0, 1] }\n",
             r":3: verification\.environment key 'True' must be an input variable name",
+        ),
+        (
+            # The key is on a later line than the section, so the error must
+            # point to the key itself.
+            "verification:\n  environment:\n    start: { range: [0, 1] }\n"
+            "    010: { range: [0, 1] }\n",
+            r":4: verification\.environment key '10' must be an input variable name",
         ),
         (
             "verification:\n  environment:\n    start: { range: [1, 0] }\n",

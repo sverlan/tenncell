@@ -92,7 +92,8 @@ class VerilogStateEmitter:
             consumer_state = self._state_name(rule.consumer.name)
             body_indent = 2 if emit_if else 1
             self.add_line(
-                f"{consumer_state}_prod = {consumer_state}_prod + {producer};", body_indent
+                f"{consumer_state}_prod = {consumer_state}_prod + {producer};",
+                body_indent,
             )
             if not ctx.system.module_config.zero_reset_mode:
                 for used_name in sorted(rule.vars.keys()):

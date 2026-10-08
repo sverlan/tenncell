@@ -1,0 +1,32 @@
+# Imported child module using random(), a math function missing from the old
+# emitter table, and a qualified reference to another FSM's state.
+module:
+  name: composed_functions_child
+
+cells:
+  - id: 1
+    contents:
+      - trigger = 0
+      - phase_state = 0
+      - level = 0
+      - noise = 0
+    input: [trigger]
+    output: [level]
+
+fsm:
+  - name: phase
+    variable: phase_state
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: trigger > 0.5
+              then: RUN -> phase_state
+      - RUN:
+          rules:
+            - phase_state -> phase_state
+
+rules:
+  - noise * 0 + random() -> noise
+  - level * 0 -> level
+  - phase_state == phase.RUN | atan2(1, 1) -> level

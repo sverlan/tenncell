@@ -1,0 +1,17 @@
+module:
+  name: numerical_semantics
+cells:
+  - id: 1
+    contents:
+      - sensor = 0
+      - rounded = 0.1
+      - extreme = 10000000000000000
+      - motor = 0.1
+    input: [sensor]
+    output: [rounded, extreme, motor]
+rules:
+  - 0 * rounded + 0.05 -> rounded
+  - 0.005 -> rounded
+  - 0 * extreme + 1 -> extreme
+  - 0 * motor + 0.05 -> motor
+  - 0.005 * sensor -> motor

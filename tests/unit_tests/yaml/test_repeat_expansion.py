@@ -170,7 +170,9 @@ def test_repeat_rejects_non_list_body():
 
 
 def test_yaml_loader_executes_repeat_fixture():
-    path = Path(__file__).resolve().parents[2] / "fixtures" / "functional" / "repeat.yaml"
+    path = (
+        Path(__file__).resolve().parents[2] / "fixtures" / "functional" / "repeat.yaml"
+    )
     system = NncSystem.from_yaml(str(path))
 
     assert sorted(system.variables) == ["x_0", "x_1", "x_2"]

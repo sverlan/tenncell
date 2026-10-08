@@ -1,0 +1,22 @@
+# Small steering controller for the closed-loop equivalence test: a sensor
+# input accumulates into a consumed weight, which sets two output speeds.
+module:
+  name: steering
+
+cells:
+  - id: 1
+    contents:
+      - s = 0
+      - w = 0
+      - left = 0, right = 0
+    input: [s]
+    output: [left, right]
+
+rules:
+  - s * 3.3 -> w
+  - s * 0.7 -> w
+  - 0 - 0.1 -> w
+  - left * 0 -> left
+  - right * 0 -> right
+  - 1 - w -> left
+  - 1 + w * 0.9 -> right

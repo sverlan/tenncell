@@ -37,6 +37,7 @@ def _load_raw_yaml_document(
     data, locations = load_yaml_with_includes(source_path, import_paths_resolved)
     return RawYamlDocument.from_data(source_path, data, locations)
 
+
 def _build_system_from_raw_document(
     system_cls: type["NncSystem"],
     raw_document: RawYamlDocument,
@@ -66,7 +67,9 @@ def _build_system_from_raw_document(
     raw_data_cache[source_path] = raw_document.data
 
     try:
-        nnc.module_config = parse_module_config(raw_document.module, source_path)
+        nnc.module_config = parse_module_config(
+            raw_document.module, source_path, raw_document.locations
+        )
     except Exception as e:
         raise as_yaml_located_error(
             e, source_path, raw_document.locations.line_for("module")
@@ -93,7 +96,9 @@ def _build_system_from_raw_document(
             )
         cell_id = cell_data.get("id")
         if not isinstance(cell_id, int):
-            raise raw_document.locations.error("Cell id must be an integer", "cells", cell_index)
+            raise raw_document.locations.error(
+                "Cell id must be an integer", "cells", cell_index
+            )
         contents = {}
         expanded_contents = expand_repeat_items(
             cell_data.get("contents", []),

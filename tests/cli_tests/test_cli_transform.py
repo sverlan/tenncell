@@ -110,9 +110,7 @@ class TestMain:
                 )
 
     def test_main_file_not_found(self):
-        with patch(
-            "sys.argv", ["nnc-gen", "nonexistent.yaml", "-t", "python"]
-        ):
+        with patch("sys.argv", ["nnc-gen", "nonexistent.yaml", "-t", "python"]):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 main()
                 assert (
@@ -441,6 +439,72 @@ class TestWebotsMainContract:
                 assert "read_method must be a string" in error_output
 
 
+def test_python_generation_rejects_custom_function_and_continues_batch(monkeypatch):
+    from nnc.parser.ast.value.math_functions import MathFunctions
+
+    monkeypatch.setitem(MathFunctions._functions, "double_it", lambda value: 2 * value)
+    monkeypatch.setitem(MathFunctions._function_arg_counts, "double_it", 1)
+    with TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        custom = tmp_path / "custom.yaml"
+        custom.write_text(
+            "cells:\n  - id: 1\n    contents:\n      - x = 0\n    output: [x]\n"
+            "rules:\n  - x * 0 + double_it(0.5) -> x\n",
+            encoding="utf-8",
+        )
+        out_dir = tmp_path / "out"
+        with patch(
+            "sys.argv",
+            [
+                "nnc-gen",
+                str(custom),
+                str(_fixture_path("example1.yaml")),
+                "-t",
+                "python",
+                "-o",
+                str(out_dir),
+            ],
+        ):
+            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                assert main() == 1
+
+        assert "Function 'double_it' is not available in generated Python code" in (
+            mock_stderr.getvalue()
+        )
+        assert not (out_dir / "custom.py").exists()
+        assert (out_dir / "example1.py").exists()
+
+
+def test_python_generation_rejects_non_model_file_and_continues_batch():
+    with TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        header = tmp_path / "device.header.yaml"
+        header.write_text(
+            "schema:\n  name: device\n  ports:\n    - name: ready\n"
+            "      direction: output\n      width: 1\n",
+            encoding="utf-8",
+        )
+        out_dir = tmp_path / "out"
+        with patch(
+            "sys.argv",
+            [
+                "nnc-gen",
+                str(header),
+                str(_fixture_path("example1.yaml")),
+                "-t",
+                "python",
+                "-o",
+                str(out_dir),
+            ],
+        ):
+            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                assert main() == 1
+
+        assert "nothing to generate" in mock_stderr.getvalue()
+        assert not (out_dir / "device.header.py").exists()
+        assert (out_dir / "example1.py").exists()
+
+
 def _mc2_fixture_path(*parts: str) -> Path:
     return Path(__file__).resolve().parents[1] / "fixtures" / Path(*parts)
 
@@ -449,7 +513,9 @@ class TestMc2MainContract:
     """CLI contract for ``nnc-gen -t mc2``."""
 
     def test_writes_query_ids_and_columns_files_with_suffix(self):
-        input_file = _mc2_fixture_path("transformers", "mc2", "input", "imported_mc2.yaml")
+        input_file = _mc2_fixture_path(
+            "transformers", "mc2", "input", "imported_mc2.yaml"
+        )
         expected_dir = _mc2_fixture_path("transformers", "mc2", "expected")
         with TemporaryDirectory() as tmp_dir:
             out_dir = Path(tmp_dir)
@@ -489,7 +555,8 @@ class TestMc2MainContract:
         assert (
             "Warning: " in mock_stderr.getvalue()
             and "generic verification properties are not emitted by the MC2 raw "
-            "backend yet: bounded" in mock_stderr.getvalue()
+            "backend yet: bounded"
+            in mock_stderr.getvalue()
         )
 
     def test_invalid_file_fails_but_batch_continues(self):

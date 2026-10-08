@@ -35,7 +35,10 @@ def _expected(stem: str) -> dict[str, str]:
 @pytest.mark.parametrize(
     ("path", "stem"),
     [
-        (FIXTURES / "verification" / "input" / "fsm_counter_mc2.yaml", "fsm_counter_mc2"),
+        (
+            FIXTURES / "verification" / "input" / "fsm_counter_mc2.yaml",
+            "fsm_counter_mc2",
+        ),
         (MC2 / "input" / "imported_mc2.yaml", "imported_mc2"),
     ],
 )
@@ -147,7 +150,13 @@ def test_folded_style_produces_one_query(tmp_path):
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [(3.0, "3"), (-1.0, "-1"), (2.5, "2.5"), (1e-05, "0.00001"), (1e20, "100000000000000000000")],
+    [
+        (3.0, "3"),
+        (-1.0, "-1"),
+        (2.5, "2.5"),
+        (1e-05, "0.00001"),
+        (1e20, "100000000000000000000"),
+    ],
 )
 def test_render_literal_avoids_exponent_notation(value, expected):
     assert render_literal(value) == expected

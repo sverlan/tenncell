@@ -44,9 +44,7 @@ def load_verilog_system(file_path: Path, import_paths: list[str] | None = None):
         external_input_bindings,
         external_output_bindings,
         import_output_bindings,
-    ) = (
-        transformer._build_binding_maps(system)
-    )
+    ) = transformer._build_binding_maps(system)
     transformer._emission_context = VerilogEmissionContext(
         system=system,
         config=transformer._config_for(system),
@@ -73,22 +71,14 @@ class TestVerilogHelperCoverage:
         assert transformer._type_decl("logic", 1, False) == "logic"
         assert transformer._type_decl("logic", 4, False) == "logic [3:0]"
         assert transformer._type_decl("fixed", 4, True) == "logic signed [3:0]"
-        assert (
-            transformer._type_info_encoding(
-                VerilogLogicTypeInfo(kind="logic", width=8, signed=False)
+        assert transformer._type_info_encoding(
+            VerilogLogicTypeInfo(kind="logic", width=8, signed=False)
+        ) == VerilogLogicEncoding(kind="logic", width=8, signed=False)
+        assert transformer._type_info_encoding(
+            VerilogFixedPointTypeInfo(
+                kind="fixed_point", width=8, frac_bits=3, signed=True
             )
-            == VerilogLogicEncoding(kind="logic", width=8, signed=False)
-        )
-        assert (
-            transformer._type_info_encoding(
-                VerilogFixedPointTypeInfo(
-                    kind="fixed_point", width=8, frac_bits=3, signed=True
-                )
-            )
-            == VerilogFixedPointEncoding(
-                kind="fixed", width=8, signed=True, frac_bits=3
-            )
-        )
+        ) == VerilogFixedPointEncoding(kind="fixed", width=8, signed=True, frac_bits=3)
         assert (
             transformer._type_info_decl(
                 VerilogLogicTypeInfo(kind="logic", width=8, signed=False)
@@ -114,8 +104,7 @@ class TestVerilogHelperCoverage:
         )
         assert literal_transformer._literal_param_name(1.0, 8, 2, True) == "_VAL_1_0"
         assert (
-            literal_transformer._literal_param_name(1.0, 8, 3, True)
-            == "_VAL_1_0_Q5_3"
+            literal_transformer._literal_param_name(1.0, 8, 3, True) == "_VAL_1_0_Q5_3"
         )
         assert literal_transformer._emit_literal_params() != ""
         assert literal_transformer._emit_conversion_helpers() == ""
@@ -151,11 +140,15 @@ class TestVerilogHelperCoverage:
             == "value"
         )
         assert (
-            transformer._conversion_expression("logic", 8, False, 0, "fixed", 8, True, 3)
+            transformer._conversion_expression(
+                "logic", 8, False, 0, "fixed", 8, True, 3
+            )
             == "(value <<< 3)"
         )
         assert (
-            transformer._conversion_expression("logic", 8, False, 0, "fixed", 8, True, 0)
+            transformer._conversion_expression(
+                "logic", 8, False, 0, "fixed", 8, True, 0
+            )
             == "value"
         )
         assert (
@@ -220,9 +213,9 @@ class TestVerilogHelperCoverage:
         assert transformer._reference_encoding("uart_rx") == VerilogLogicEncoding(
             kind="logic", width=1, signed=False
         )
-        assert transformer._reference_encoding("sensor0.level") == VerilogFixedPointEncoding(
-            kind="fixed", width=24, signed=True, frac_bits=8
-        )
+        assert transformer._reference_encoding(
+            "sensor0.level"
+        ) == VerilogFixedPointEncoding(kind="fixed", width=24, signed=True, frac_bits=8)
         assert transformer._resolve_connection("0", "logic", 1, False, 0) == "0"
         assert (
             transformer._resolve_connection("unknown", "logic", 1, False, 0)
@@ -324,12 +317,12 @@ class TestVerilogHelperCoverage:
             local_variables=["alarm"],
         )
 
-        assert transformer._reference_encoding("sensor0.raw") == VerilogFixedPointEncoding(
-            kind="fixed", width=24, signed=True, frac_bits=8
-        )
-        assert transformer._reference_encoding("sensor0.level") == VerilogFixedPointEncoding(
-            kind="fixed", width=24, signed=True, frac_bits=8
-        )
+        assert transformer._reference_encoding(
+            "sensor0.raw"
+        ) == VerilogFixedPointEncoding(kind="fixed", width=24, signed=True, frac_bits=8)
+        assert transformer._reference_encoding(
+            "sensor0.level"
+        ) == VerilogFixedPointEncoding(kind="fixed", width=24, signed=True, frac_bits=8)
         assert (
             transformer._resolve_connection("sensor0.raw", "fixed", 24, True, 8)
             == "sensor0__raw"
@@ -376,7 +369,5 @@ class TestVerilogHelperCoverage:
 
         system, transformer = load_verilog_system(source)
 
-        with pytest.raises(
-            ValueError, match="must not describe an interface variable"
-        ):
+        with pytest.raises(ValueError, match="must not describe an interface variable"):
             transformer.transform(system)

@@ -213,8 +213,16 @@ class VerilogStructuralEmitter:
                 imported_port = port_map.get(output_name)
                 if imported_port is None:
                     continue
-                signed = " signed" if imported_port.signed and imported_port.width > 1 else ""
-                width = "" if imported_port.width == 1 else f" [{imported_port.width - 1}:0]"
+                signed = (
+                    " signed"
+                    if imported_port.signed and imported_port.width > 1
+                    else ""
+                )
+                width = (
+                    ""
+                    if imported_port.width == 1
+                    else f" [{imported_port.width - 1}:0]"
+                )
                 self.add_line(f"logic{signed}{width} {wire_name};")
         for target_ref, (_, port) in ctx.import_output_bindings.items():
             signed = " signed" if port.signed and port.width > 1 else ""
@@ -253,7 +261,9 @@ class VerilogStructuralEmitter:
                     target_port.kind,
                     target_port.width,
                     target_port.signed,
-                    0 if target_port.kind != "fixed" else ctx.config.real_encoding.frac_bits,
+                    0
+                    if target_port.kind != "fixed"
+                    else ctx.config.real_encoding.frac_bits,
                 )
                 self.add_line(f"assign {target_signal} = {converted};")
                 emitted = True
@@ -440,7 +450,9 @@ class VerilogStructuralEmitter:
                     port.kind,
                     port.width,
                     port.signed,
-                    0 if port.kind != "fixed" else imported_config.real_encoding.frac_bits,
+                    0
+                    if port.kind != "fixed"
+                    else imported_config.real_encoding.frac_bits,
                     top_port.kind,
                     top_port.width,
                     top_port.signed,
@@ -464,13 +476,13 @@ class VerilogStructuralEmitter:
                         port.kind,
                         port.width,
                         port.signed,
-                        config.real_encoding.frac_bits
-                        if port.kind == "fixed"
-                        else 0,
+                        config.real_encoding.frac_bits if port.kind == "fixed" else 0,
                         top_port.kind,
                         top_port.width,
                         top_port.signed,
-                        0 if top_port.kind != "fixed" else config.real_encoding.frac_bits,
+                        0
+                        if top_port.kind != "fixed"
+                        else config.real_encoding.frac_bits,
                         ctx,
                     )
                     break
@@ -481,6 +493,8 @@ class VerilogStructuralEmitter:
                     f"assign {top_port.verilog_name} = {self._convert_local_fixed_to_target(output_name, top_port.kind, top_port.width, top_port.signed, ctx)};"
                 )
             else:
-                self.add_line(f"assign {top_port.verilog_name} = {external_assignment};")
+                self.add_line(
+                    f"assign {top_port.verilog_name} = {external_assignment};"
+                )
         if ctx.system.output_variables:
             self.add_line()

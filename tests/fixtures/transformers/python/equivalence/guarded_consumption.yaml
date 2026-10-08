@@ -1,0 +1,20 @@
+# A variable consumed only on steps where an input-dependent guard is active,
+# with two contributions to the same consumer.
+module:
+  name: guarded_consumption
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - acc = 0.1
+      - out = 0
+    input: [u]
+    output: [acc, out]
+
+rules:
+  - u > 0.5 | acc * 0.5 -> out
+  - u > 0.5 | acc * 0.25 -> out
+  - u * 0.055 -> acc
+  - 0.005 -> acc
+  - out * 0 -> out

@@ -1,0 +1,21 @@
+# Self-referential persistence combined with extra contributions to the same
+# consumed variable, plus a variable that is never consumed.
+module:
+  name: persistence
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - level = 0.1
+      - total = 0
+      - gain = 0.3
+    input: [u]
+    output: [level, total]
+
+rules:
+  - level -> level
+  - u * gain -> level
+  - 0.01 -> level
+  - 0.7 * level -> total
+  - gain -> gain

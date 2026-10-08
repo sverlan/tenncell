@@ -189,6 +189,8 @@ the more complex typed blink example.
 
 ## YAML Schema
 
+TENNCell reads plain YAML values with the YAML 1.2 rules: only `true`/`false` are booleans, so words such as `on`, `off`, `yes`, and `no` are ordinary names (an FSM can have states `ON` and `OFF`), and `010` is the number 10. Numbers may use `0x...`, `0o...`, `0b...`, and underscores (`1_000`). Boolean settings such as `zero_reset_mode` must be `true` or `false`.
+
 A sample example looks like
 
 ```yaml

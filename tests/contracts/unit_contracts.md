@@ -7,6 +7,7 @@ should verify these promises, not internal implementation details.
 
 - `tests/unit_tests/model/` covers the core runtime model.
 - `tests/unit_tests/parser/` covers parser and value semantics.
+- `tests/unit_tests/yaml/` covers YAML loading, value resolution, includes, and lowering.
 - `tests/unit_tests/transformers/base/` covers the transformer base class.
 - `tests/unit_tests/transformers/package/` covers package exports.
 - `tests/unit_tests/transformers/python/` covers Python backend behavior.
@@ -29,6 +30,8 @@ should verify these promises, not internal implementation details.
 
 ## Parser and Value Contracts
 
+- `load_yaml_data_and_locations()` resolves plain YAML values with YAML 1.2 core rules (including `0o...` octal) plus `0b...` and `1_000` numbers: `on`/`off`/`yes`/`no` are strings, a leading zero is decimal, an exponent makes a float, and dates and `1:30` stay strings, for both values and keys.
+- `module.zero_reset_mode` and the Verilog `signed` fields accept only YAML booleans and report other values with their YAML line.
 - `parse_expression()` parses valid TENNCell expressions into the expected AST shape.
 - `parse_condition()` parses boolean conditions and rejects invalid syntax with a clear error.
 - `parse_variable_assignment()` parses assignments into variable mappings and respects the provided context.
@@ -43,6 +46,11 @@ should verify these promises, not internal implementation details.
 - `nnc.transformers` exports `BaseTransformer`, `Mc2Transformer`, `PythonTransformer`, `VerilogTransformer`, and `WebotsTransformer`.
 - `BaseTransformer.transform_files()` defaults to one file built from `transform()` and `get_file_extension()`.
 - `PythonTransformer` emits the standalone Python backend for a single TENNCell system.
+- For the same inputs and deterministic expressions supported by the generated Python backend, generated Python `step()` is bitwise-identical to `NncSystem.step()`, including the evaluation order of guards and productions, over many steps and in closed feedback loops.
+- Every default `MathFunctions` function has a generated-Python mapping, and each one gives the same result as the simulator; `random()` is executable but not compared with the simulator.
+- Functions without a generated-Python mapping, and runtime overrides of default functions, are rejected at generation time; `nnc-gen -t python` reports the error and continues with the remaining files.
+- Python generation rejects documents with no model variables or semantic imports instead of emitting an invalid empty class.
+- Qualified FSM state references resolve to their state constants in standalone and composed generated Python.
 - Composed Python generation emits one file for the import closure and preserves module class structure.
 - Generated Python code keeps the current CSV command-line behavior.
 - `zero_reset_mode` changes the generated step/reset behavior as documented.

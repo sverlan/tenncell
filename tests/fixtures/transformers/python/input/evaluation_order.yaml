@@ -1,0 +1,12 @@
+module:
+  name: evaluation_order
+cells:
+  - id: 1
+    contents:
+      - x = 1
+      - y = 0
+    output: [y]
+rules:
+  - guard0(x) > 0 | producer0(x) -> y
+  - guard1(x) > 0 | producer1(x) -> y
+  - x < 0 | 1 / 0 -> y

@@ -1,0 +1,20 @@
+# zero_reset_mode with several contributions to one variable and an input.
+module:
+  name: zero_reset_equivalence
+  zero_reset_mode: true
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - x = 0.1
+      - y = 0
+    input: [u]
+    output: [x, y]
+
+rules:
+  - x -> x
+  - u * 0.055 -> x
+  - 0.005 -> x
+  - x * 0.2 + u -> y
+  - y * 0.1 -> y

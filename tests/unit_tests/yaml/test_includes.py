@@ -200,7 +200,7 @@ verilog:
                     raw_data=raw_cache[system.source_path],
                     locations=system.source_locations,
                 ),
-        )
+            )
 
         assert error_info.value.source_path == verilog
         assert error_info.value.line == 3

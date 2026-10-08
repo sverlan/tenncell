@@ -36,25 +36,20 @@ class NncSystem:
 
         # TENNCell step using _new variables approach
 
-        # Step 1: Initialize _new versions of all variables from current state
-        input_x_new = self.input_x
-        out_new = self.out
-
-        # Step 2: Track variables consumed by active rules
+        # Step 1: Evaluate rules on the current state
         used_vars = set()
-
-        # Step 3: Evaluate active rules and collect consumed variables
         # Rule 1
-        out_new += (self.input_x + 1.0)
+        _p0 = (self.input_x + 1.0)
         used_vars.add('input_x')
 
-        # Step 4: Remove old values from dynamically used variables
-        if 'input_x' in used_vars:
-            input_x_new -= self.input_x
-        if 'out' in used_vars:
-            out_new -= self.out
+        # Step 2: Initialize _new versions of all variables from consumption state
+        input_x_new = 0.0 if 'input_x' in used_vars else self.input_x
+        out_new = 0.0 if 'out' in used_vars else self.out
 
-        # Step 5: Update all variables to their final values
+        # Step 3: Accumulate stored productions in rule order
+        out_new += _p0
+
+        # Step 4: Update all variables to their final values
         self.input_x = input_x_new
         self.out = out_new
 

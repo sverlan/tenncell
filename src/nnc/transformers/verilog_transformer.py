@@ -87,9 +87,7 @@ class VerilogTransformer(
             resolved[name] = type_info
         return resolved
 
-    def _type_info_from_port(
-        self, port, real_encoding
-    ) -> VerilogTypeInfo:
+    def _type_info_from_port(self, port, real_encoding) -> VerilogTypeInfo:
         """Convert one port declaration into a backend Verilog type hint."""
         if port.kind == "fixed":
             assert real_encoding is not None
@@ -130,7 +128,12 @@ class VerilogTransformer(
                 imported_port = imported_ports.get(input_name)
                 if imported_port is None:
                     continue
-                add(ref, self._type_info_from_port(imported_port, imported_config.real_encoding))
+                add(
+                    ref,
+                    self._type_info_from_port(
+                        imported_port, imported_config.real_encoding
+                    ),
+                )
             for output_name in item.system.output_variables.keys():
                 if output_name not in system.variables:
                     continue
@@ -173,9 +176,7 @@ class VerilogTransformer(
             external_input_bindings,
             external_output_bindings,
             import_output_bindings,
-        ) = (
-            self._build_binding_maps(system)
-        )
+        ) = self._build_binding_maps(system)
         resolved_var_types = self._resolved_internal_types(
             system,
             config,

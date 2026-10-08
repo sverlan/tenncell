@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.1
+
+- Changed YAML value resolution to YAML 1.2 core rules (including `0x` and `0o` numbers, and keeping `0b` and `1_000`). Behavior change: plain `on`, `off`, `yes`, `no` are now strings instead of booleans, `010` is 10 instead of octal 8, `1e5` is a float, and dates and `1:30` stay strings. No file in the repository is affected.
+- Fixed `module.zero_reset_mode` and the Verilog `signed` fields accepting non-boolean values: `zero_reset_mode: "false"` silently enabled zero-reset mode. These settings now accept only `true` or `false`.
+
+- Fixed generated Python and Webots `step()` arithmetic: consumed variables now start from zero before productions are added, so deterministic expressions supported by generated Python produce results bitwise-identical to the simulator. Previously `((x + c1) + c2) - x` produced rounding differences that could change closed-loop behavior, and `nan` when the old value was infinite.
+- Fixed generated Python and Webots code crashing with `NameError` on valid models:
+  - all default functions are now supported (`acos`, `asin`, `atan`, `atan2`, `cosh`, `sinh`, `tanh`, `degrees`, `radians`, `log10`, and `hypot` were missing, and `random()` lost its parentheses);
+  - qualified FSM states such as `ctrl.ACTIVE` used in another FSM's rules now resolve to their state constant.
+- Generated Python now rejects runtime-registered custom functions, including overrides of default names, at generation time with a clear error instead of silently changing behavior or producing code that fails when run.
+- Generated Python now rejects external headers and include-only documents with a clear "nothing to generate" error instead of emitting an invalid empty class.
+
 ## 0.8.0
 
 - Added the planned `verification` section parser and MC2 raw query generation through `nnc-gen -t mc2`.

@@ -1,0 +1,21 @@
+# Root module importing a child that uses random(), atan2(), and a qualified
+# FSM state reference.
+module:
+  name: composed_functions_root
+
+imports:
+  - module: composed_functions_child.yaml
+    as: child
+    connections:
+      trigger: start
+
+cells:
+  - id: 1
+    contents:
+      - start = 0
+      - result = 0
+    input: [start]
+    output: [result]
+
+rules:
+  - result * 0 + child.level -> result

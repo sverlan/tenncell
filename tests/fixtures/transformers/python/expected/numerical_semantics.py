@@ -3,8 +3,10 @@ import math
 
 class NncSystem:
     def __init__(self):
-        self.input_x = 0.0
-        self.out = 0.0
+        self.sensor = 0.0
+        self.rounded = 0.1
+        self.extreme = 1e+16
+        self.motor = 0.1
 
     def step(self, inputs):
         """Execute one step of the TENNCell system.
@@ -16,42 +18,69 @@ class NncSystem:
             Dictionary with output variable values
         """
         # Validate that all input variables are provided
-        required_inputs = ['input_x']
+        required_inputs = ['sensor']
         for var_name in required_inputs:
             if var_name not in inputs:
                 raise ValueError(f'Input variable {var_name} is required but not provided')
 
         # Update input variables
-        self.input_x = inputs['input_x']
+        self.sensor = inputs['sensor']
 
         # TENNCell step using _new variables approach
 
         # Step 1: Evaluate rules on the current state
         used_vars = set()
         # Rule 1
-        _p0 = (self.input_x + 1.0)
-        used_vars.add('input_x')
+        _p0 = ((0.0 * self.rounded) + 0.05)
+        used_vars.add('rounded')
+
+        # Rule 2
+        _p1 = 0.005
+
+        # Rule 3
+        _p2 = ((0.0 * self.extreme) + 1.0)
+        used_vars.add('extreme')
+
+        # Rule 4
+        _p3 = ((0.0 * self.motor) + 0.05)
+        used_vars.add('motor')
+
+        # Rule 5
+        _p4 = (0.005 * self.sensor)
+        used_vars.add('sensor')
 
         # Step 2: Initialize _new versions of all variables from consumption state
-        input_x_new = 0.0 if 'input_x' in used_vars else self.input_x
-        out_new = 0.0 if 'out' in used_vars else self.out
+        extreme_new = 0.0 if 'extreme' in used_vars else self.extreme
+        motor_new = 0.0 if 'motor' in used_vars else self.motor
+        rounded_new = 0.0 if 'rounded' in used_vars else self.rounded
+        sensor_new = 0.0 if 'sensor' in used_vars else self.sensor
 
         # Step 3: Accumulate stored productions in rule order
-        out_new += _p0
+        rounded_new += _p0
+        rounded_new += _p1
+        extreme_new += _p2
+        motor_new += _p3
+        motor_new += _p4
 
         # Step 4: Update all variables to their final values
-        self.input_x = input_x_new
-        self.out = out_new
+        self.extreme = extreme_new
+        self.motor = motor_new
+        self.rounded = rounded_new
+        self.sensor = sensor_new
 
         # Return output variables
         return {
-            'out': self.out,
+            'rounded': self.rounded,
+            'extreme': self.extreme,
+            'motor': self.motor,
         }
 
     def get_variables(self):
         return {
-            'input_x': self.input_x,
-            'out': self.out,
+            'extreme': self.extreme,
+            'motor': self.motor,
+            'rounded': self.rounded,
+            'sensor': self.sensor,
         }
 
 
@@ -89,11 +118,13 @@ def main():
 
     step_num = 0
     if args.csv_include_initial:
-        fieldnames = ['step'] + ['out']
+        fieldnames = ['step'] + ['rounded', 'extreme', 'motor']
         writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, delimiter=args.csv_delimiter, lineterminator='\n')
         writer.writeheader()
         initial_output = {
-            'out': format_csv_value(system.out, args.csv_precision),
+            'rounded': format_csv_value(system.rounded, args.csv_precision),
+            'extreme': format_csv_value(system.extreme, args.csv_precision),
+            'motor': format_csv_value(system.motor, args.csv_precision),
         }
         step0_row = {'step': 0}
         step0_row.update(initial_output)
@@ -106,10 +137,10 @@ def main():
             input_row = next(reader)
             # Convert input values to float
             inputs = {}
-            if 'input_x' in input_row:
-                inputs['input_x'] = float(input_row['input_x'])
+            if 'sensor' in input_row:
+                inputs['sensor'] = float(input_row['sensor'])
             else:
-                print(f'Error: Input variable input_x not found in CSV row {step_num + 1}', file=sys.stderr)
+                print(f'Error: Input variable sensor not found in CSV row {step_num + 1}', file=sys.stderr)
                 sys.exit(1)
 
             # Execute step
@@ -117,7 +148,7 @@ def main():
 
             # Initialize CSV writer on first row
             if writer is None:
-                fieldnames = ['step'] + ['out']
+                fieldnames = ['step'] + ['rounded', 'extreme', 'motor']
                 writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, delimiter=args.csv_delimiter, lineterminator='\n')
                 writer.writeheader()
 

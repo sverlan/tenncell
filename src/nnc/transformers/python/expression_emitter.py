@@ -4,10 +4,59 @@ from typing import Any
 
 from ...parser.ast import *
 from ...parser.ast.value import *
+from ...parser.ast.value.math_functions import MathFunctions
+
+
+CONSTANT = "constant"
+CALL = "call"
+
+# How each default ``MathFunctions`` function is emitted in generated Python.
+# Constants are emitted without a call; calls always keep their parentheses.
+PYTHON_FUNCTIONS: dict[str, tuple[str, str]] = {
+    "pi": (CONSTANT, "math.pi"),
+    "e": (CONSTANT, "math.e"),
+    **{
+        name: (CALL, f"math.{name}")
+        for name in [
+            "sin",
+            "cos",
+            "tan",
+            "asin",
+            "acos",
+            "atan",
+            "sinh",
+            "cosh",
+            "tanh",
+            "exp",
+            "log",
+            "log10",
+            "sqrt",
+            "ceil",
+            "floor",
+            "degrees",
+            "radians",
+            "pow",
+            "atan2",
+            "hypot",
+        ]
+    },
+    "abs": (CALL, "abs"),
+    "max": (CALL, "max"),
+    "min": (CALL, "min"),
+    "round": (CALL, "round"),
+    "random": (CALL, "random.random"),
+}
+
+
+class UnsupportedFunctionError(ValueError):
+    """Raised when a function has no standalone generated-Python equivalent."""
 
 
 class PythonExpressionEmitter:
     """Emit Python expressions from TENNCell AST nodes."""
+
+    _current_system = None
+    _uses_random = False
 
     def _reference_code(self, reference: str) -> str:
         if "." in reference:
@@ -45,6 +94,10 @@ class PythonExpressionEmitter:
     def visit_ReferenceExpression(self, node: ReferenceExpression) -> str:
         """Visit a qualified reference expression."""
         reference = ".".join(node.parts)
+        system = self._current_system
+        fsm_constant = "__".join(node.parts)
+        if system is not None and fsm_constant in system.constants:
+            return self.visit_value(system.constants[fsm_constant])
         ctx = getattr(self, "_emission_context", None)
         if ctx is not None and ctx.composed_mode:
             return self._reference_code(reference)
@@ -93,29 +146,23 @@ class PythonExpressionEmitter:
 
     def visit_FunctionCallExpression(self, node) -> str:
         """Visit a function call expression."""
-        args = [self.visit(arg) for arg in node.arguments]
-        args_str = ", ".join(args)
-
-        function_mappings = {
-            "sin": "math.sin",
-            "cos": "math.cos",
-            "tan": "math.tan",
-            "exp": "math.exp",
-            "log": "math.log",
-            "sqrt": "math.sqrt",
-            "pow": "math.pow",
-            "abs": "abs",
-            "floor": "math.floor",
-            "ceil": "math.ceil",
-            "pi": "math.pi",
-            "e": "math.e",
-        }
-
-        python_function = function_mappings.get(node.function_name, node.function_name)
-
-        if len(node.arguments) == 0:
+        if node.function_name not in PYTHON_FUNCTIONS:
+            raise UnsupportedFunctionError(
+                f"Function '{node.function_name}' is not available in generated "
+                "Python code"
+            )
+        if not MathFunctions._is_default_function(node.function_name):
+            raise UnsupportedFunctionError(
+                f"Function '{node.function_name}' is not available in generated "
+                "Python code because its default implementation was overridden"
+            )
+        kind, python_function = PYTHON_FUNCTIONS[node.function_name]
+        if kind == CONSTANT:
             return python_function
-        return f"{python_function}({args_str})"
+        if node.function_name == "random":
+            self._uses_random = True
+        args = ", ".join(self.visit(arg) for arg in node.arguments)
+        return f"{python_function}({args})"
 
     def visit_BooleanConstantExpression(self, node: BooleanConstantExpression) -> str:
         """Visit a boolean constant expression."""

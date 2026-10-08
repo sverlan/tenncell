@@ -118,7 +118,7 @@ def _run() -> int:
             if len(nnc.input_variables) > 0:
                 raise ValueError(
                     "Cannot run in continuous compute mode with input variables"
-            )
+                )
             if args.csv:
                 # CSV output mode
                 result = {
@@ -215,10 +215,7 @@ def _compute_json_row(step: int, nnc: NncSystem) -> dict[str, float | int]:
     """Return one flat compute-mode JSON output row."""
     row: dict[str, float | int] = {"Step": step}
     row.update(
-        {
-            name: variable.value.value
-            for name, variable in nnc.output_variables.items()
-        }
+        {name: variable.value.value for name, variable in nnc.output_variables.items()}
     )
     return row
 

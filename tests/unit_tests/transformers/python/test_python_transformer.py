@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 
 from nnc.model.system import NncSystem
+from nnc.parser.ast.value.math_functions import MathFunctions
+from nnc.transformers.python.expression_emitter import CALL, PYTHON_FUNCTIONS
 from nnc.transformers.python_transformer import PythonTransformer
 
 
@@ -49,7 +51,9 @@ class TestPythonTransformer:
     def test_transform_generates_csv_processing_for_inputs(self):
         result = assert_matches_fixture("csv_with_input.yaml", "csv_with_input.py")
         assert "import csv" in result
-        assert "reader = csv.DictReader(sys.stdin, delimiter=args.csv_delimiter)" in result
+        assert (
+            "reader = csv.DictReader(sys.stdin, delimiter=args.csv_delimiter)" in result
+        )
         assert "parser.add_argument('--csv-include-initial'" in result
         assert "parser.add_argument('--csv-delimiter'" in result
         assert "required_inputs = ['input_x']" in result
@@ -100,6 +104,83 @@ class TestPythonTransformer:
 
         assert generated_output == runtime_output
 
+    def test_generated_step_matches_runtime_floating_point_semantics(self):
+        runtime_system = load_system("numerical_semantics.yaml")
+        generated_code = assert_matches_fixture(
+            "numerical_semantics.yaml", "numerical_semantics.py"
+        )
+
+        namespace = {"__name__": "generated_test"}
+        exec(generated_code, namespace)
+        generated_system = namespace["NncSystem"]()
+
+        runtime_output = runtime_system.step({"sensor": 1.0})
+        generated_output = generated_system.step({"sensor": 1.0})
+
+        assert generated_output == runtime_output
+        assert generated_output["rounded"].hex() == (0.055).hex()
+        assert generated_output["extreme"] == 1.0
+
+    def test_generated_step_matches_runtime_in_feedback_loop(self):
+        runtime_system = load_system("numerical_semantics.yaml")
+        generated_code = PythonTransformer().transform(runtime_system)
+
+        namespace = {"__name__": "generated_test"}
+        exec(generated_code, namespace)
+        generated_system = namespace["NncSystem"]()
+        runtime_sensor = generated_sensor = 1.0
+        threshold = 0.05500000000000001
+
+        for _ in range(1000):
+            runtime_output = runtime_system.step({"sensor": runtime_sensor})
+            generated_output = generated_system.step({"sensor": generated_sensor})
+            assert generated_output == runtime_output
+            runtime_sensor = float(runtime_output["motor"] >= threshold)
+            generated_sensor = float(generated_output["motor"] >= threshold)
+            assert generated_sensor == runtime_sensor
+
+    def test_generated_step_preserves_rule_evaluation_order(self, monkeypatch):
+        calls: list[str] = []
+
+        def record(name: str, result: float):
+            def function(_value: float) -> float:
+                calls.append(name)
+                return result
+
+            return function
+
+        functions = {
+            "guard0": record("guard0", 1.0),
+            "producer0": record("producer0", 0.1),
+            "guard1": record("guard1", 1.0),
+            "producer1": record("producer1", 0.2),
+        }
+        for name, function in functions.items():
+            monkeypatch.setitem(MathFunctions._functions, name, function)
+            monkeypatch.setitem(MathFunctions._function_arg_counts, name, 1)
+            # Custom functions are rejected by generated Python; this test maps
+            # them explicitly as test-only defaults and supplies them in the
+            # exec namespace below.
+            monkeypatch.setitem(MathFunctions._default_functions, name, function)
+            monkeypatch.setitem(MathFunctions._default_function_arg_counts, name, 1)
+            monkeypatch.setitem(PYTHON_FUNCTIONS, name, (CALL, name))
+
+        runtime_system = load_system("evaluation_order.yaml")
+        generated_code = PythonTransformer().transform(runtime_system)
+        namespace = {"__name__": "generated_test", **functions}
+        exec(generated_code, namespace)
+        generated_system = namespace["NncSystem"]()
+
+        runtime_output = runtime_system.step()
+        runtime_calls = calls.copy()
+        calls.clear()
+        generated_output = generated_system.step()
+
+        expected_calls = ["guard0", "producer0", "guard1", "producer1"]
+        assert runtime_calls == expected_calls
+        assert calls == expected_calls
+        assert generated_output == runtime_output
+
     def test_transform_zero_reset_mode_omits_used_vars(self):
         result = assert_matches_fixture("zero_reset.yaml", "zero_reset.py")
         assert "used_vars = set()" not in result
@@ -111,4 +192,3 @@ class TestPythonTransformer:
         result = assert_matches_fixture("zero_reset.yaml", "zero_reset.py")
         assert "trigger_new = self.trigger" in result
         assert "out_new = 0.0" in result
-

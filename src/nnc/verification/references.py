@@ -98,9 +98,7 @@ def _imported(name: str, system: "NncSystem") -> ResolvedReference | None:
 def _alias(name: str, system: "NncSystem") -> ResolvedReference:
     expression = system.aliases[name]
     if isinstance(expression, VariableExpression):
-        return ResolvedReference(
-            name, VARIABLE, expression.variable.name, alias=name
-        )
+        return ResolvedReference(name, VARIABLE, expression.variable.name, alias=name)
     if isinstance(expression, ReferenceExpression):
         target = ".".join(expression.parts)
         if _imported(target, system) is None:

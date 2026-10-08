@@ -121,14 +121,9 @@ class _Parser:
         for name, item in data.items():
             path = ("environment", name)
             if not isinstance(name, str):
-                # Locations are indexed by the key's source text, which may not
-                # match str(name) (e.g. `true`, `0x1`); fall back to the section.
-                key_path: tuple[str, ...] = ("environment", str(name))
-                if self.context.locations.location_for(_SECTION, *key_path) is None:
-                    key_path = ("environment",)
                 raise self.error(
                     f"verification.environment key '{name}' must be an input variable name",
-                    *key_path,
+                    *path,
                 )
             if item is None:
                 item = {}
@@ -155,7 +150,9 @@ class _Parser:
     ) -> tuple[float, float] | None:
         if raw is None:
             return None
-        message = f"verification.environment.{name}.range must be [lo, hi] with lo <= hi"
+        message = (
+            f"verification.environment.{name}.range must be [lo, hi] with lo <= hi"
+        )
         if not isinstance(raw, list) or len(raw) != 2:
             raise self.error(message, *path)
         if not all(_is_number(value) for value in raw):
@@ -222,9 +219,7 @@ class _Parser:
     def _backends(self, raw: object) -> dict[str, BackendSection]:
         if raw is None:
             return {}
-        data = self._mapping(
-            raw, "verification.backends must be a mapping", "backends"
-        )
+        data = self._mapping(raw, "verification.backends must be a mapping", "backends")
         backends: dict[str, BackendSection] = {}
         for name, item in data.items():
             path = ("backends", name)
