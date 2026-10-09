@@ -1,0 +1,80 @@
+# Test-owned fixture: every generic property kind, checked by native and by MC2
+# on the same recorded traces (tests/functional_tests/test_mc2_native_crosscheck.py).
+# p is the condition, t the trigger; the model's rules are never run.
+module:
+  name: mc2_crosscheck
+
+cells:
+  - id: 1
+    contents:
+      - p = 0
+      - t = 0
+    input: [t]
+    output: [p]
+
+rules:
+  - p -> p
+
+verification:
+  properties:
+    - id: always
+      always: p > 0
+    - id: always_from3
+      always: p > 0
+      from_step: 3
+    - id: never_from3
+      never: p > 0
+      from_step: 3
+    - id: eventually
+      eventually: p > 0
+    - id: eventually_from3
+      eventually: p > 0
+      from_step: 3
+    - id: within_1_2
+      eventually: p > 0
+      within: [1, 2]
+    - id: within_from3
+      eventually: p > 0
+      within: [0, 1]
+      from_step: 3
+    - id: after_0
+      when: t > 0
+      then: p > 0
+      after: 0
+    - id: after_1
+      when: t > 0
+      then: p > 0
+      after: 1
+    - id: after_2
+      when: t > 0
+      then: p > 0
+      after: 2
+    - id: after_1_from3
+      when: t > 0
+      then: p > 0
+      after: 1
+      from_step: 3
+    - id: response_0_2
+      when: t > 0
+      then: p > 0
+      within: [0, 2]
+    - id: response_1_1
+      when: t > 0
+      then: p > 0
+      within: [1, 1]
+    - id: persists_0
+      when: t > 0
+      then_always: p > 0
+    - id: persists_1
+      when: t > 0
+      then_always: p > 0
+      after: 1
+    - id: persists_2
+      when: t > 0
+      then_always: p > 0
+      after: 2
+    - id: cover
+      cover: p > 0
+    - id: cover_from3
+      cover: p > 0
+      from_step: 3

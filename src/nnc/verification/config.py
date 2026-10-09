@@ -41,19 +41,59 @@ class RawEntry:
     yaml_path: YamlPath
 
 
+ALWAYS = "always"
+NEVER = "never"
+EVENTUALLY = "eventually"
+EVENTUALLY_WITHIN = "eventually_within"
+RESPONSE_AFTER = "response_after"
+RESPONSE_WITHIN = "response_within"
+PERSISTENCE = "persistence"
+COVER = "cover"
+PROPERTY_KINDS: tuple[str, ...] = (
+    ALWAYS,
+    NEVER,
+    EVENTUALLY,
+    EVENTUALLY_WITHIN,
+    RESPONSE_AFTER,
+    RESPONSE_WITHIN,
+    PERSISTENCE,
+    COVER,
+)
+
+
 @dataclass(frozen=True, slots=True)
-class PropertyStub:
-    """Generic property identity parsed before generic kinds are supported.
+class GenericProperty:
+    """One backend-neutral verification property (spec section 4).
 
     Args:
         id: Property identifier, unique among generic properties.
+        kind: One of ``PROPERTY_KINDS``.
+        condition: Condition text ``P`` (TENNCell guard syntax).
+        condition_key: YAML key holding ``P`` (``always``, ``then``, ...).
+        trigger: Trigger text ``T`` for ``when`` kinds, else ``None``.
+        after: Row offset for ``response_after`` and ``persistence``, else ``None``.
+        within: Inclusive ``(a, b)`` row window for ``*_within`` kinds, else ``None``.
+        from_step: First row (by position) at which the property is evaluated.
         targets: Explicit target backend names, or ``None`` for the default.
+        description: Optional human-readable description.
         yaml_path: Effective YAML path of the property, used for located errors.
     """
 
     id: str
+    kind: str
+    condition: str
+    condition_key: str
+    trigger: str | None
+    after: int | None
+    within: tuple[int, int] | None
+    from_step: int
     targets: tuple[str, ...] | None
+    description: str | None
     yaml_path: YamlPath
+
+    def targets_backend(self, backend: str) -> bool:
+        """Return whether the property is meant for a backend (no targets: all)."""
+        return self.targets is None or backend in self.targets
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,13 +120,13 @@ class VerificationConfig:
     Args:
         environment: Input assumptions keyed by root input variable name.
         trace_semantics: Global end-of-trace semantics, ``strict`` or ``weak``.
-        properties: Generic property stubs in YAML order.
+        properties: Generic properties in YAML order.
         backends: Backend sections keyed by backend name.
     """
 
     environment: dict[str, InputEnvironment] = field(default_factory=dict)
     trace_semantics: str = "strict"
-    properties: tuple[PropertyStub, ...] = ()
+    properties: tuple[GenericProperty, ...] = ()
     backends: dict[str, BackendSection] = field(default_factory=dict)
 
     def backend(self, name: str) -> BackendSection | None:

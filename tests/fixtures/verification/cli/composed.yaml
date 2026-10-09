@@ -1,0 +1,20 @@
+# nnc-verify CLI fixture: properties on an imported module's output.
+# sensor.yaml is found through --import-path (tests/fixtures/verification/references).
+imports:
+  - module: sensor.yaml
+    as: sensor0
+    connections:
+      raw: sample
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+    input: [sample]
+
+verification:
+  properties:
+    - id: level_nonnegative
+      always: sensor0.level >= 0
+    - id: level_rises
+      eventually: sensor0.level > 1

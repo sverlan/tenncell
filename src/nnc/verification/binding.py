@@ -9,6 +9,7 @@ from ..inputs.yaml.errors import YamlLocatedError
 from ..inputs.yaml.locations import YamlLocationIndex
 from .config import RawEntry, VerificationConfig
 from .placeholders import Placeholder, TemplateError, TextSegment, parse_template
+from .generic_properties.binding import BoundProperty, bind_property
 from .references import ResolvedReference, resolve_reference
 
 if TYPE_CHECKING:
@@ -35,10 +36,12 @@ class BoundVerification:
     Args:
         config: Parsed verification config.
         raw: Bound raw entries keyed by backend name.
+        properties: Bound generic properties in YAML order.
     """
 
     config: VerificationConfig
     raw: dict[str, tuple[BoundRawEntry, ...]]
+    properties: tuple[BoundProperty, ...] = ()
 
 
 def bind_verification(
@@ -58,7 +61,8 @@ def bind_verification(
 
     Raises:
         YamlLocatedError: If an environment key is not a root input variable,
-            or a raw placeholder is malformed, unknown, or ambiguous.
+            a raw placeholder is malformed, unknown, or ambiguous, or a generic
+            property condition does not bind (see ``bind_property``).
     """
     for name in config.environment:
         if name not in system.input_variables:
@@ -72,7 +76,10 @@ def bind_verification(
         name: tuple(_bind_entry(entry, system, locations) for entry in section.raw)
         for name, section in config.backends.items()
     }
-    return BoundVerification(config=config, raw=raw)
+    properties = tuple(
+        bind_property(prop, system, locations) for prop in config.properties
+    )
+    return BoundVerification(config=config, raw=raw, properties=properties)
 
 
 def _bind_entry(

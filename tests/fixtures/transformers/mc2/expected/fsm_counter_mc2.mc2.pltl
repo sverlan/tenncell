@@ -1,3 +1,4 @@
 P=?[ F([done] = 1) ]
 P>=1[ G([counter] <= 3) ]
 P=?[ F([ctrl_state] = 2 ^ [done] = 1) ]
+P=?[G(([counter] <= 3))]

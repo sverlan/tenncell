@@ -11,9 +11,17 @@ from .config import (
     RESERVED_BACKENDS,
     SVA_MODES,
     TRACE_SEMANTICS,
+    ALWAYS,
+    COVER,
+    EVENTUALLY,
+    EVENTUALLY_WITHIN,
+    NEVER,
+    PERSISTENCE,
+    RESPONSE_AFTER,
+    RESPONSE_WITHIN,
     BackendSection,
+    GenericProperty,
     InputEnvironment,
-    PropertyStub,
     RawEntry,
     VerificationConfig,
     YamlPath,
@@ -28,6 +36,83 @@ _BACKEND_KEYS = {
 }
 _RAW_ENTRY_KEYS = ("id", "description", "code")
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+# Keys that select a property kind; `targets`, `from_step`, ... are shared fields.
+_KIND_KEYS = frozenset(
+    {
+        "always",
+        "never",
+        "eventually",
+        "within",
+        "when",
+        "then",
+        "then_always",
+        "after",
+        "cover",
+    }
+)
+_PROPERTY_KEYS = (
+    "id",
+    "description",
+    "targets",
+    "from_step",
+    "always",
+    "never",
+    "eventually",
+    "within",
+    "when",
+    "then",
+    "then_always",
+    "after",
+    "cover",
+)
+# Every valid combination of kind keys (spec section 4.2).
+_KIND_BY_KEYS: dict[frozenset[str], str] = {
+    frozenset({"always"}): ALWAYS,
+    frozenset({"never"}): NEVER,
+    frozenset({"eventually"}): EVENTUALLY,
+    frozenset({"eventually", "within"}): EVENTUALLY_WITHIN,
+    frozenset({"when", "then", "after"}): RESPONSE_AFTER,
+    frozenset({"when", "then", "within"}): RESPONSE_WITHIN,
+    frozenset({"when", "then_always"}): PERSISTENCE,
+    frozenset({"when", "then_always", "after"}): PERSISTENCE,
+    frozenset({"cover"}): COVER,
+}
+# YAML key holding the condition `P` of each kind.
+_CONDITION_KEY = {
+    ALWAYS: "always",
+    NEVER: "never",
+    EVENTUALLY: "eventually",
+    EVENTUALLY_WITHIN: "eventually",
+    RESPONSE_AFTER: "then",
+    RESPONSE_WITHIN: "then",
+    PERSISTENCE: "then_always",
+    COVER: "cover",
+}
+_VALID_COMBINATIONS = (
+    "always; never; eventually [+ within]; when + then + (after | within); "
+    "when + then_always [+ after]; cover"
+)
+
+
+def _kind_error(keys: frozenset[str]) -> str:
+    """Explain why a set of kind keys is not a valid property kind."""
+    if not keys:
+        return f"defines no property kind; valid kinds: {_VALID_COMBINATIONS}"
+    if "then" in keys and "then_always" in keys:
+        return "'then' and 'then_always' cannot be combined"
+    if "when" in keys and not keys & {"then", "then_always"}:
+        return "'when' needs 'then' or 'then_always'"
+    if keys & {"then", "then_always"} and "when" not in keys:
+        return "'then'/'then_always' needs 'when'"
+    if keys >= {"when", "then"} and not keys & {"after", "within"}:
+        return "'when' + 'then' needs exactly one of 'after' or 'within'"
+    if keys >= {"after", "within"}:
+        return "'after' and 'within' cannot be combined"
+    return (
+        f"invalid combination of keys {', '.join(sorted(keys))}; "
+        f"valid kinds: {_VALID_COMBINATIONS}"
+    )
 
 
 def parse_verification_section(
@@ -162,12 +247,12 @@ class _Parser:
             raise self.error(message, *path)
         return lo, hi
 
-    def _properties(self, raw: object) -> tuple[PropertyStub, ...]:
+    def _properties(self, raw: object) -> tuple[GenericProperty, ...]:
         if raw is None:
             return ()
         if not isinstance(raw, list):
             raise self.error("verification.properties must be a list", "properties")
-        stubs: list[PropertyStub] = []
+        properties: list[GenericProperty] = []
         seen: set[str] = set()
         for index, item in enumerate(raw):
             path: YamlPath = ("properties", index)
@@ -184,14 +269,91 @@ class _Parser:
                     f"Duplicate verification property id '{property_id}'", *path, "id"
                 )
             seen.add(property_id)
-            stubs.append(
-                PropertyStub(
-                    id=property_id,
-                    targets=self._targets(entry.get("targets"), *path, "targets"),
-                    yaml_path=(_SECTION, *path),
-                )
+            properties.append(self._property(property_id, entry, path))
+        return tuple(properties)
+
+    def _property(
+        self, property_id: str, entry: dict, path: YamlPath
+    ) -> GenericProperty:
+        label = f"Verification property '{property_id}'"
+        if "probability" in entry:
+            raise self.error(
+                f"{label}: 'probability' is reserved and not supported yet",
+                *path,
+                "probability",
             )
-        return tuple(stubs)
+        self._reject_unknown_keys(
+            entry, _PROPERTY_KEYS, f"verification property '{property_id}'", *path
+        )
+        kind_keys = frozenset(entry) & _KIND_KEYS
+        kind = _KIND_BY_KEYS.get(kind_keys)
+        if kind is None:
+            raise self.error(f"{label}: {_kind_error(kind_keys)}", *path)
+        condition_key = _CONDITION_KEY[kind]
+        description = entry.get("description")
+        if description is not None and not isinstance(description, str):
+            raise self.error(
+                f"{label}: description must be a string", *path, "description"
+            )
+        return GenericProperty(
+            id=property_id,
+            kind=kind,
+            condition=self._condition(
+                entry[condition_key], label, *path, condition_key
+            ),
+            condition_key=condition_key,
+            trigger=(
+                self._condition(entry["when"], label, *path, "when")
+                if "when" in entry
+                else None
+            ),
+            after=self._after(entry, kind, label, *path),
+            within=(
+                self._window(entry["within"], label, *path, "within")
+                if "within" in entry
+                else None
+            ),
+            from_step=self._non_negative(
+                entry.get("from_step", 0), f"{label}: from_step", *path, "from_step"
+            ),
+            targets=self._targets(entry.get("targets"), *path, "targets"),
+            description=description,
+            yaml_path=(_SECTION, *path),
+        )
+
+    def _condition(self, raw: object, label: str, *path: object) -> str:
+        if isinstance(raw, bool):
+            return "true" if raw else "false"
+        if isinstance(raw, str) and raw.strip():
+            return raw
+        if isinstance(raw, (dict, list)):
+            raise self.error(
+                f"{label}: conditions must be TENNCell expressions; nested "
+                "properties are not supported in v1",
+                *path,
+            )
+        raise self.error(f"{label}: condition must be a non-empty string", *path)
+
+    def _non_negative(self, raw: object, label: str, *path: object) -> int:
+        if not isinstance(raw, int) or isinstance(raw, bool) or raw < 0:
+            raise self.error(f"{label} must be a non-negative integer", *path)
+        return raw
+
+    def _after(self, entry: dict, kind: str, label: str, *path: object) -> int | None:
+        if "after" in entry:
+            return self._non_negative(entry["after"], f"{label}: after", *path, "after")
+        return 0 if kind == PERSISTENCE else None
+
+    def _window(self, raw: object, label: str, *path: object) -> tuple[int, int]:
+        message = f"{label}: within must be [a, b] with integers 0 <= a <= b"
+        if not isinstance(raw, list) or len(raw) != 2:
+            raise self.error(message, *path)
+        if not all(isinstance(v, int) and not isinstance(v, bool) for v in raw):
+            raise self.error(message, *path)
+        start, end = raw
+        if start < 0 or start > end:
+            raise self.error(message, *path)
+        return start, end
 
     def _targets(self, raw: object, *path: object) -> tuple[str, ...] | None:
         if raw is None:

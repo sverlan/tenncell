@@ -544,7 +544,9 @@ class TestMc2MainContract:
                 assert generated == expected
 
     def test_prints_skipped_property_warning(self):
-        input_file = _mc2_fixture_path("verification", "input", "fsm_counter_mc2.yaml")
+        input_file = _mc2_fixture_path(
+            "transformers", "mc2", "input", "generic_mc2.yaml"
+        )
         with TemporaryDirectory() as tmp_dir:
             with patch(
                 "sys.argv", ["nnc-gen", str(input_file), "-t", "mc2", "-o", tmp_dir]
@@ -554,8 +556,8 @@ class TestMc2MainContract:
 
         assert (
             "Warning: " in mock_stderr.getvalue()
-            and "generic verification properties are not emitted by the MC2 raw "
-            "backend yet: bounded"
+            and "generic verification properties skipped for MC2: root_check "
+            "(calls sqrt; MC2 queries cannot call functions)"
             in mock_stderr.getvalue()
         )
 
@@ -593,6 +595,6 @@ class TestMc2MainContract:
 
             errors = mock_stderr.getvalue()
             assert "bad.yaml:7: Verification backend 'prism' is reserved" in errors
-            assert "No MC2 raw verification entries found" in errors
+            assert "No MC2 verification entries found" in errors
             assert (out_dir / "fsm_counter_mc2.mc2.pltl").exists()
             assert not (out_dir / "bad.mc2.pltl").exists()

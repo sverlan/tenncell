@@ -1,4 +1,4 @@
-"""MC2 query-file transformer for TENNCell verification raw entries."""
+"""MC2 query-file transformer for TENNCell verification entries."""
 
 from __future__ import annotations
 
@@ -9,10 +9,20 @@ from ..model.system import NncSystem
 from ..verification.binding import BoundVerification
 from ..verification.mc2 import QUERIES_SUFFIX, render_mc2
 from .base_transformer import BaseTransformer
+from .webots.webots_config import WebotsCsvConfig
+
+# Trace separators MC2 v2.0beta2 reads: whitespace by default, ";" with -snoopy.
+MC2_TRACE_DELIMITERS = (" ", "\t", ";")
+
+NOTHING_TO_EMIT = (
+    "No MC2 verification entries found: add verification.backends.mc2.raw "
+    "entries or verification.properties that MC2 can check"
+)
 
 
 class Mc2Transformer(BaseTransformer):
-    """Emit MC2 query, ID, and trace-column files from ``mc2`` raw entries."""
+    """Emit MC2 query, ID, and trace-column files from ``mc2`` raw entries and
+    generic verification properties."""
 
     def __init__(
         self, verification_configs: dict[Path, BoundVerification | None] | None = None
@@ -25,6 +35,21 @@ class Mc2Transformer(BaseTransformer):
         """
         super().__init__()
         self.verification_configs = verification_configs or {}
+        self.webots_csv_configs: dict[Path, WebotsCsvConfig | None] = {}
+
+    def set_webots_csv_configs(
+        self, configs: dict[Path, WebotsCsvConfig | None]
+    ) -> None:
+        """Set the Webots CSV log configuration of each system, if any.
+
+        Used only for trace-source warnings: columns listed in
+        ``webots.csv.variables`` are recorded by the Webots controller's log.
+
+        Args:
+            configs: Mapping from TENNCell source paths to the parsed
+                ``webots.csv`` config, or ``None`` when the model has none.
+        """
+        self.webots_csv_configs = configs
 
     def set_verification_configs(
         self, configs: dict[Path, BoundVerification | None]
@@ -63,41 +88,64 @@ class Mc2Transformer(BaseTransformer):
             ``.mc2.columns``.
 
         Raises:
-            ValueError: If the system has no ``verification.backends.mc2.raw``
-                entries.
-            YamlLocatedError: If a raw entry is not a single MC2 query.
+            ValueError: If nothing is emitted: no ``verification.backends.mc2.raw``
+                entries and no generic property for MC2.
+            YamlLocatedError: If a raw entry is not a single MC2 query, or a
+                generic property cannot be emitted (see ``render_mc2``).
         """
         self.warnings = []
         bound = self._config_for(system)
-        if bound is None or not bound.raw.get("mc2"):
-            raise ValueError(
-                "No MC2 raw verification entries found (verification.backends.mc2.raw)"
-            )
+        if bound is None:
+            raise ValueError(NOTHING_TO_EMIT)
         locations = system.source_locations or YamlLocationIndex(
             _source_path(system), {}
         )
         artifacts = render_mc2(bound, locations)
-        skipped = [
-            stub.id
-            for stub in bound.config.properties
-            if stub.targets is None or "mc2" in stub.targets
-        ]
-        if skipped:
-            self.warnings.append(
-                "generic verification properties are not emitted by the MC2 raw "
-                f"backend yet: {', '.join(skipped)}"
-            )
-        untraced = [
-            column
-            for column in artifacts.columns
-            if column not in system.output_variables
-        ]
+        self.warnings.extend(artifacts.warnings)
+        if not artifacts.queries:
+            raise ValueError(NOTHING_TO_EMIT)
+        self._warn_about_trace_sources(system, artifacts.columns)
+        return artifacts.files()
+
+    def _warn_about_trace_sources(
+        self, system: NncSystem, columns: tuple[str, ...]
+    ) -> None:
+        """Warn when no known trace source records a column MC2 needs.
+
+        Two trace sources are known: ``nnc-sim`` CSV output (root output
+        variables only) and, when the model has ``webots.csv``, the Webots
+        controller's CSV log (``webots.csv.variables``).
+        """
+        webots_csv = self.webots_csv_configs.get(_source_path(system))
+        outputs = set(system.output_variables)
+        if webots_csv is None:
+            untraced = [column for column in columns if column not in outputs]
+            if untraced:
+                self.warnings.append(
+                    "MC2 trace columns are not root outputs, so nnc-sim traces will "
+                    f"not contain them: {', '.join(untraced)}"
+                )
+            return
+
+        logged = set(webots_csv.variables)
+        untraced = [column for column in columns if column not in outputs | logged]
         if untraced:
             self.warnings.append(
-                "MC2 trace columns are not root outputs, so nnc-sim traces will "
-                f"not contain them: {', '.join(untraced)}"
+                "MC2 trace columns are neither root outputs (nnc-sim traces) nor "
+                "listed in webots.csv.variables (Webots CSV log): "
+                f"{', '.join(untraced)}"
             )
-        return artifacts.files()
+        if not webots_csv.include_step:
+            self.warnings.append(
+                "webots.csv.include_step is false, but MC2 reads the first trace "
+                "column as time; set include_step: true to use the Webots CSV log "
+                "with MC2"
+            )
+        if webots_csv.delimiter not in MC2_TRACE_DELIMITERS:
+            self.warnings.append(
+                f"webots.csv.delimiter {webots_csv.delimiter!r} cannot be read by "
+                'MC2; use " " (or ";" with the MC2 -snoopy option)'
+            )
 
     def _config_for(self, system: NncSystem) -> BoundVerification | None:
         """Return the bound verification config of a loaded system."""

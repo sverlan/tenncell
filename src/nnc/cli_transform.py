@@ -16,6 +16,7 @@ from nnc.transformers import (
     VerilogTransformer,
     WebotsTransformer,
 )
+from nnc.transformers.webots.webots_config import WebotsCsvConfig
 from nnc.transformers.webots.webots_yaml_section_parser import parse_webots_section
 from nnc.transformers.verilog.verilog_yaml_section_parser import parse_verilog_section
 from nnc.verification.binding import BoundVerification, bind_verification
@@ -168,6 +169,9 @@ def main():
                 transformer.set_verification_configs(
                     _parse_verification_configs([nnc_system], raw_data_cache)
                 )
+                transformer.set_webots_csv_configs(
+                    _parse_webots_csv_configs([nnc_system], raw_data_cache)
+                )
                 systems_to_emit = [nnc_system]
             else:
                 systems_to_emit = [nnc_system]
@@ -274,6 +278,23 @@ def _parse_webots_configs(
             data, context, {"webots": parse_webots_section}
         )
         configs[system.source_path] = parsed["webots"]
+    return configs
+
+
+def _parse_webots_csv_configs(
+    systems: list[NncSystem],
+    raw_data_cache: dict[Path, dict],
+) -> dict[Path, WebotsCsvConfig | None]:
+    """Return each system's ``webots.csv`` config, or ``None`` without a Webots log."""
+    configs: dict[Path, WebotsCsvConfig | None] = {}
+    for system in systems:
+        if system.source_path is None:
+            raise ValueError("MC2 export requires systems loaded from YAML files")
+        if "webots" not in raw_data_cache[system.source_path]:
+            configs[system.source_path] = None
+            continue
+        webots = _parse_webots_configs([system], raw_data_cache)[system.source_path]
+        configs[system.source_path] = webots.csv
     return configs
 
 

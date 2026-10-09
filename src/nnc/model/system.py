@@ -8,33 +8,15 @@ from .cell import Cell
 from ..inputs.yaml.module_config import ImportConfig, ModuleConfig
 from ..inputs.yaml.locations import YamlLocationIndex
 from ..parser.ast import (
-    BooleanAndExpression,
-    BooleanConstantExpression,
-    BooleanEqualTestExpression,
     BooleanExpression,
-    BooleanGreaterEqualTestExpression,
-    BooleanGreaterTestExpression,
-    BooleanLessEqualTestExpression,
-    BooleanLessTestExpression,
-    BooleanNotEqualTestExpression,
-    BooleanNotExpression,
-    BooleanOrExpression,
-    ConstantExpression,
-    DifferenceExpression,
-    DivisionExpression,
     Expression,
-    IntDivisionExpression,
-    IntMultiplicationExpression,
-    MultiplicationExpression,
     ReferenceExpression,
-    SumExpression,
-    UnaryMinusExpression,
     VariableExpression,
 )
-from ..parser.ast.expression import FunctionCallExpression
 from ..parser.ast.variable import Variable
 from ..parser.ast.value import FloatValue
 from ..parser.ast.value.math_functions import MathFunctions
+from .evaluation import evaluate_boolean, evaluate_expression
 from .rule import Rule
 from ..inputs.yaml.yaml_loader import load_system_from_yaml
 
@@ -132,52 +114,25 @@ class NncSystem:
 
         raise ValueError(f"Unknown runtime reference '{reference}'")
 
+    def variable_value(self, node: VariableExpression) -> FloatValue:
+        """Return a variable's current runtime value (evaluation context)."""
+        return cast(FloatValue, node.variable.value)
+
+    def reference_value(self, reference: str) -> FloatValue:
+        """Return a qualified reference's runtime value (evaluation context)."""
+        return cast(FloatValue, self._resolve_runtime_reference(reference))
+
+    def call_function(self, name: str, arguments: list[float]) -> FloatValue:
+        """Call a registered TENNCell function (evaluation context)."""
+        return FloatValue(MathFunctions.evaluate(name, arguments))
+
     def _evaluate_expression(self, node: Expression) -> FloatValue:
         """Evaluate a TENNCell expression against the current runtime state.
 
         Args:
             node: TENNCell expression AST node.
         """
-        if isinstance(node, ConstantExpression):
-            return cast(FloatValue, node.value)
-        if isinstance(node, VariableExpression):
-            return cast(FloatValue, node.variable.value)
-        if isinstance(node, ReferenceExpression):
-            return cast(
-                FloatValue, self._resolve_runtime_reference(".".join(node.parts))
-            )
-        if isinstance(node, SumExpression):
-            return self._evaluate_expression(node.left) + self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, DifferenceExpression):
-            return self._evaluate_expression(node.left) - self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, MultiplicationExpression):
-            return self._evaluate_expression(node.left) * self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, DivisionExpression):
-            return self._evaluate_expression(node.left) / self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, UnaryMinusExpression):
-            return -self._evaluate_expression(node.expression)
-        if isinstance(node, IntMultiplicationExpression):
-            value = self._evaluate_expression(node.expression)
-            return value * type(value)(node.constant)
-        if isinstance(node, IntDivisionExpression):
-            value = self._evaluate_expression(node.expression)
-            return value / type(value)(node.constant)
-        if isinstance(node, FunctionCallExpression):
-            args = [
-                self._evaluate_expression(argument).value for argument in node.arguments
-            ]
-            return FloatValue(MathFunctions.evaluate(node.function_name, args))
-        raise ValueError(
-            f"Unsupported expression node at runtime: {type(node).__name__}"
-        )
+        return evaluate_expression(node, self)
 
     def _evaluate_boolean(self, node: BooleanExpression) -> bool:
         """Evaluate a TENNCell boolean expression against the current runtime state.
@@ -185,43 +140,7 @@ class NncSystem:
         Args:
             node: TENNCell boolean AST node.
         """
-        if isinstance(node, BooleanConstantExpression):
-            return node.value
-        if isinstance(node, BooleanAndExpression):
-            return self._evaluate_boolean(node.left) and self._evaluate_boolean(
-                node.right
-            )
-        if isinstance(node, BooleanOrExpression):
-            return self._evaluate_boolean(node.left) or self._evaluate_boolean(
-                node.right
-            )
-        if isinstance(node, BooleanNotExpression):
-            return not self._evaluate_boolean(node.expression)
-        if isinstance(node, BooleanLessTestExpression):
-            return self._evaluate_expression(node.left) < self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, BooleanLessEqualTestExpression):
-            return self._evaluate_expression(node.left) <= self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, BooleanGreaterTestExpression):
-            return self._evaluate_expression(node.left) > self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, BooleanGreaterEqualTestExpression):
-            return self._evaluate_expression(node.left) >= self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, BooleanEqualTestExpression):
-            return self._evaluate_expression(node.left) == self._evaluate_expression(
-                node.right
-            )
-        if isinstance(node, BooleanNotEqualTestExpression):
-            return self._evaluate_expression(node.left) != self._evaluate_expression(
-                node.right
-            )
-        raise ValueError(f"Unsupported boolean node at runtime: {type(node).__name__}")
+        return evaluate_boolean(node, self)
 
     def _direct_import_step_order(self) -> list[ImportConfig]:
         """Return imports in dependency order for a single simulation step."""

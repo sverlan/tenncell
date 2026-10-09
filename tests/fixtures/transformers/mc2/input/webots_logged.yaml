@@ -1,0 +1,40 @@
+# MC2 queries on a Webots controller whose CSV log records every column the
+# queries need, including an input and an internal variable.
+module:
+  name: webots_logged
+
+cells:
+  - id: 1
+    contents:
+      - s = 0
+      - w = 0
+      - y = 0
+    input: [s]
+    output: [y]
+
+rules:
+  - s * 2 -> w
+  - y * 0 + w -> y
+
+webots:
+  bindings:
+    s:
+      device: ps0
+      read_method: getValue
+    y:
+      device: motor
+      write_method: setVelocity
+  csv:
+    file: log.txt
+    variables: [s, w, y]
+    include_step: true
+    delimiter: " "
+
+verification:
+  backends:
+    mc2:
+      raw:
+        - id: weight_follows_sensor
+          code: "P=?[ G([${w}] = 2 * [${s}]) ]"
+        - id: output_nonnegative
+          code: "P>=1[ G([${y}] >= 0) ]"

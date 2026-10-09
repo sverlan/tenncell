@@ -63,3 +63,14 @@ For each change in logic, behavior, schema, or code generation:
 
 1. Update `rules.md` to document the change.
 
+
+## Agent instructions
+
+Read and follow `AGENT_PROTOCOL.md`.
+
+The protocol defines:
+- PRIMARY and REVIEWER roles
+- how Claude and Codex consult each other
+- reviewer invocation rules
+- loop prevention
+- what to do when no role is assigned

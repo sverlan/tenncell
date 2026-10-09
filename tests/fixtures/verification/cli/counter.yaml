@@ -1,0 +1,29 @@
+# nnc-verify CLI fixture: an input-driven counter with an internal variable.
+# x counts the rows where the input t is positive; done latches once x >= 3.
+# `spare` is used only by the mc2-only property, so native never needs it.
+cells:
+  - id: 1
+    contents:
+      - t = 0, x = 0, done = 0, spare = 0
+    input: [t]
+    output: [x]
+
+rules:
+  - x -> x
+  - t > 0 | 1 -> x
+  - done -> done
+  - x >= 2 && t > 0 && done == 0 | 1 -> done
+
+verification:
+  properties:
+    - id: x_nonnegative
+      always: x >= 0
+    - id: counts_on_trigger
+      when: t > 0
+      then: x > 0
+      after: 0
+    - id: reaches_done
+      eventually: done == 1
+    - id: mc2_only
+      never: spare > 100
+      targets: [mc2]

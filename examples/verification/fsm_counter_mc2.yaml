@@ -1,24 +1,32 @@
 # Verification example: the FSM counter from examples/fsm/fsm_counter.yaml
-# with MC2 raw queries.
+# with generic properties and MC2 raw queries. start.csv holds the input rows
+# at the end of this file.
 #
-# Generate the MC2 files:
-#   nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
-# This writes out/fsm_counter_mc2.mc2.pltl (one MC2 query per line),
-# out/fsm_counter_mc2.mc2.ids (the query IDs, in the same order), and
-# out/fsm_counter_mc2.mc2.columns (the trace columns the queries need).
+# 1. Check the generic properties with the built-in native checker on a
+#    simulated run:
+#      nnc-verify examples/verification/fsm_counter_mc2.yaml --inputs start.csv
+#    Row 0 is the initial state and each input row drives one step. Every
+#    property passes and reaches_done_state is covered. With fewer input rows
+#    the run ends before DONE, and done_raised and run_finishes fail
+#    (trace_semantics: weak would report them as pending instead).
 #
-# ${name} placeholders are checked against the model and rendered as bare
-# column names or numeric literals; the MC2 brackets are written by hand.
-# The generic `properties` entry is parsed but not emitted to MC2 yet, so
-# nnc-gen prints a warning about it.
+# 2. Record a trace and check it with native and with MC2. nnc-sim traces
+#    contain only output variables, so every variable the properties and queries
+#    use (ctrl_state, counter, done) is declared as an output below. MC2 reads
+#    the first trace column as time, so add a step column:
+#      nnc-sim examples/verification/fsm_counter_mc2.yaml start.csv out/trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "
+#      nnc-verify examples/verification/fsm_counter_mc2.yaml --trace out/trace.txt --delimiter " "
+#      nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
+#      java -jar MC2v2.0beta2.jar stoch out/trace.txt out/fsm_counter_mc2.mc2.pltl
+#    nnc-gen writes out/fsm_counter_mc2.mc2.pltl (one MC2 query per line: the
+#    raw queries, then the generic properties), out/fsm_counter_mc2.mc2.ids
+#    (the IDs, in the same order), and out/fsm_counter_mc2.mc2.columns (the
+#    trace columns the queries need). MC2 prints 1.0,true,true,1.0,1.0,1.0,1.0,1.0,
+#    agreeing with native. distance_to_max calls a function, which MC2 queries
+#    cannot express, so it targets native only and is not emitted for MC2.
 #
-# nnc-sim traces contain only output variables, so every variable the queries
-# use (ctrl_state, counter, done) is declared as an output below. MC2 reads the
-# first trace column as time, so add a step column (start.csv holds the input
-# rows below, space-separated like the trace):
-#   nnc-sim examples/verification/fsm_counter_mc2.yaml start.csv out/trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "
-#   java -jar MC2v2.0beta2.jar stoch out/trace.txt out/fsm_counter_mc2.mc2.pltl
-# MC2 prints 1.0,true,true for the three queries.
+# In raw code, ${name} placeholders are checked against the model and rendered
+# as bare column names or numeric literals; the MC2 brackets are written by hand.
 module:
   name: fsm_counter_mc2
 
@@ -66,8 +74,26 @@ verification:
     start: { range: [0, 1] }
   properties:
     - id: counter_bounded
-      description: Planned generic form of the MC2 query below
+      description: The counter never exceeds MAX_COUNT
       always: counter <= MAX_COUNT
+    - id: done_raised
+      description: done is eventually raised
+      eventually: done == 1
+    - id: run_finishes
+      description: A run started from 0 reaches DONE within MAX_COUNT + 1 steps
+      when: ctrl_state == ctrl.RUN && counter == 0
+      then: ctrl_state == ctrl.DONE
+      within: [1, 4]
+    - id: done_latches
+      description: Once raised, done stays raised
+      when: done == 1
+      then_always: done == 1
+    - id: reaches_done_state
+      cover: ctrl_state == ctrl.DONE
+    - id: distance_to_max
+      description: Uses a function, so it is checked by native only
+      always: abs(MAX_COUNT - counter) <= MAX_COUNT
+      targets: [native]
   backends:
     mc2:
       raw:
@@ -83,11 +109,13 @@ verification:
             P>=1[ G([${ctrl_state}] = ${ctrl.DONE}
             -> [${done}] = 1) ]
 
-#Example of input CSV
+#Example of input CSV (start.csv)
 #start
 #0
 #0
 #1
 #0
 #1
+#0
+#0
 #0

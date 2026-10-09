@@ -10,7 +10,7 @@ from nnc.inputs.yaml.locations import YamlLocationIndex, load_yaml_data_and_loca
 from nnc.inputs.yaml.sections import YamlSectionContext
 from nnc.verification import (
     InputEnvironment,
-    PropertyStub,
+    GenericProperty,
     parse_verification_section,
 )
 
@@ -115,7 +115,7 @@ verification:
     assert config.effective_trace_semantics("native") == "strict"
 
 
-def test_property_stubs_keep_targets(tmp_path):
+def test_properties_keep_targets_and_fields(tmp_path):
     config = _parse_text(
         tmp_path,
         """
@@ -125,13 +125,42 @@ verification:
       always: x > 0
       targets: [native, mc2]
     - id: p2
+      description: Reaches one
       eventually: x > 1
+      from_step: 3
 """,
     )
     assert config.properties == (
-        PropertyStub("p1", ("native", "mc2"), ("verification", "properties", 0)),
-        PropertyStub("p2", None, ("verification", "properties", 1)),
+        GenericProperty(
+            id="p1",
+            kind="always",
+            condition="x > 0",
+            condition_key="always",
+            trigger=None,
+            after=None,
+            within=None,
+            from_step=0,
+            targets=("native", "mc2"),
+            description=None,
+            yaml_path=("verification", "properties", 0),
+        ),
+        GenericProperty(
+            id="p2",
+            kind="eventually",
+            condition="x > 1",
+            condition_key="eventually",
+            trigger=None,
+            after=None,
+            within=None,
+            from_step=3,
+            targets=None,
+            description="Reaches one",
+            yaml_path=("verification", "properties", 1),
+        ),
     )
+    assert config.properties[0].targets_backend("mc2")
+    assert not config.properties[0].targets_backend("sva")
+    assert config.properties[1].targets_backend("sva")
 
 
 @pytest.mark.parametrize(
@@ -194,12 +223,14 @@ verification:
             r":3: Verification property id must be an identifier",
         ),
         (
-            "verification:\n  properties:\n    - id: p\n    - id: p\n",
-            r":4: Duplicate verification property id 'p'",
+            "verification:\n  properties:\n    - id: p\n      always: x\n"
+            "    - id: p\n      always: x\n",
+            r":5: Duplicate verification property id 'p'",
         ),
         (
-            "verification:\n  properties:\n    - id: p\n      targets: [prism]\n",
-            r":4: Verification backend 'prism' is reserved",
+            "verification:\n  properties:\n    - id: p\n      always: x\n"
+            "      targets: [prism]\n",
+            r":5: Verification backend 'prism' is reserved",
         ),
         (
             "verification:\n  backends:\n    spin: {}\n",

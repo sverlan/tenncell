@@ -1,0 +1,26 @@
+# An import alias and an FSM share the name `ctrl`, and the FSM has a state
+# named like the imported output, so `ctrl.level` is ambiguous.
+module:
+  name: ambiguous_reference
+
+imports:
+  - module: sensor.yaml
+    as: ctrl
+    connections:
+      raw: sample
+
+cells:
+  - id: 1
+    contents:
+      - sample = 0
+      - mode = 0
+    input: [sample]
+
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: level
+    states:
+      - level:
+          rules:
+            - mode -> mode

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- New user guide `docs/generic_properties.md`: syntax and semantics of every generic property kind, the row-based time model, `strict`/`weak` end of trace, reporting, targets and the MC2 translation, with worked examples.
+- `examples/verification/fsm_counter_mc2.yaml` now has generic properties of several kinds and documents the full workflow: `nnc-verify` on a simulated run, and a recorded `nnc-sim` trace checked by both `nnc-verify` and MC2.
+- `nnc-gen -t mc2` now translates generic verification properties into MC2 queries, appended after the raw entries. Properties that call functions are skipped with a warning (an error if they target `mc2` explicitly); an emitted property ID that equals a raw MC2 ID is an error; with `trace_semantics: weak`, warnings explain how MC2 approximates `pending`. The error for a model with nothing to emit is now "No MC2 verification entries found".
+- Internal: generic property modules moved to `nnc.verification.generic_properties` (`binding`, `native`, `conditions`, `mc2`).
+- Added `nnc-verify`, which checks generic verification properties with the built-in `native` checker on a simulated run (`--steps`, `--inputs`) or a recorded trace (`--trace`), with table or JSON output and exit status `1` when a property fails.
+- Generic verification properties (`verification.properties`) are now fully parsed and bound to the model: every property kind, bounds, `from_step`, and conditions checked against the model's names and functions. API change: `nnc.verification.PropertyStub` is replaced by `GenericProperty`.
+- `nnc-gen -t mc2` now takes the Webots controller's CSV log (`webots.csv`) into account: columns listed in `webots.csv.variables` no longer trigger the "not root outputs" warning, and it warns when the log has no step column or a delimiter MC2 cannot read.
+- Documented MC2 v2.0beta2 query pitfalls in `docs/verification.md`: `->` combined with `X` always evaluates to false, the strict end of trace and its weak form, nested `X` for bounded windows, and `G` versus `F` for "always" rules.
+
 ## 0.8.1
 
 - Changed YAML value resolution to YAML 1.2 core rules (including `0x` and `0o` numbers, and keeping `0b` and `1_000`). Behavior change: plain `on`, `off`, `yes`, `no` are now strings instead of booleans, `010` is 10 instead of octal 8, `1e5` is a float, and dates and `1:30` stay strings. No file in the repository is affected.

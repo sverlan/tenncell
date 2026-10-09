@@ -10,7 +10,7 @@ them to generated code.
 - Python source export through `nnc-gen -t python`, including import-composed systems as a single generated file
 - Verilog/SystemVerilog export through `nnc-gen -t verilog`
 - Webots Python controller export through `nnc-gen -t webots`
-- MC2 model-checker query generation through `nnc-gen -t mc2`, from raw queries in the `verification` section
+- property checking with `nnc-verify` (built-in `native` checker, on a simulated run or a recorded trace), and MC2 model-checker query generation through `nnc-gen -t mc2`, from generic properties and raw queries in the `verification` section
 - Optional import/composition metadata for optimized Verilog generation
 
 ## Installation
@@ -146,7 +146,9 @@ For each root file, `nnc-gen -t mc2` writes three files:
 - `<stem>.mc2.ids`: the entry IDs, in the same order;
 - `<stem>.mc2.columns`: the trace columns the queries need.
 
-Generic `verification.properties` are parsed but not emitted yet; `nnc-gen` warns when it skips them.
+Generic `verification.properties` are translated to MC2 queries too, after the raw entries (IDs in `.mc2.ids`). MC2 queries cannot call functions: such a property is skipped with a warning, or is an error if it lists `mc2` in `targets`. With `trace_semantics: weak`, MC2 approximates `pending` and `nnc-gen` says so.
+
+Traces can also come from the Webots controller's CSV log: with `webots.csv` set to `include_step: true` and `delimiter: " "`, every variable listed in `webots.csv.variables` (inputs included) can be used in queries, and `nnc-gen -t mc2` only warns about columns that neither trace source records.
 
 To check the queries, MC2 needs a trace whose **first column is time**, followed by every column in `.mc2.columns`. `nnc-sim` writes only output variables, so declare the variables your queries use as outputs (`nnc-gen -t mc2` warns about columns that are not outputs), and add the time column with `--csv-include-step`:
 
@@ -161,12 +163,20 @@ java -jar MC2v2.0beta2.jar stoch out/trace.txt out/fsm_counter_mc2.mc2.pltl
 MC2 v2.0beta2 query syntax, checked against the tool:
 - `^` is "and", uppercase `V` is "or", `->` or `=>` is "implies", and `¬` (U+00AC) is "not". `!`, `&`, `|`, and lowercase `v` are rejected; `!` only appears in `!=`.
 - `nnc-gen` writes query files in UTF-8. Java 18+ reads them correctly; with older Java use `java -Dfile.encoding=UTF-8 -jar ...` when queries contain `¬`.
-The full planned verification design is in `docs/verification.md`.
+The full verification design is in `docs/verification.md`. `docs/generic_properties.md` is a user guide to the syntax and semantics of every generic property kind, with worked examples.
 
-Example:
+`examples/verification/fsm_counter_mc2.yaml` walks through the whole workflow: `nnc-verify` on a simulated run, then `nnc-sim` to record a trace that `nnc-verify` and MC2 both check, with the same results.
+
+### Checking properties with nnc-verify
+`nnc-verify` checks the generic `verification.properties` of a model with the built-in `native` checker:
+
 ```powershell
-nnc-gen examples/verification/fsm_counter_mc2.yaml -t mc2 -o out
+nnc-verify model.yaml --steps 100              # autonomous model: simulate, then check
+nnc-verify model.yaml --inputs start.csv       # model with inputs: simulate on input rows
+nnc-verify model.yaml --trace run.txt --delimiter " "   # check a recorded trace (e.g. a Webots log)
 ```
+
+Simulation records every variable, including internal ones. For a recorded trace, a first column named `step`, `_step`, `time`, or `Time` gives the step labels. Each property is reported as `pass`, `fail` (with the row where it failed), `pending` (weak semantics), `covered`/`not_covered`, or `skipped` (not targeted at `native`); `--json` prints the same as JSON. The exit status is `1` if any property fails. See `docs/verification.md` section 6 for the semantics.
 
 ### Verilog backend
 `nnc-gen -t verilog` generates SystemVerilog RTL.
@@ -605,7 +615,7 @@ See `examples/` for:
 - Verilog composition examples in `examples/composition/verilog_composed/`
 - FPGA-oriented examples under `examples/fpga/`, including standalone `blink.yaml`, `blink_if.yaml`, and `ledwalk.yaml`, plus dedicated folders for `blink_uart/`, `blink_uart_typed/`, `sensor_controller/`, `fpga_uart_led/`, `fpga_spi_gpio_bridge/`, and `axii/`
 - Webots controller examples under `examples/webots/`, including `e_puck_pid/` and `pioneer3_dx_obstacle_avoidance/`
-- verification examples under `examples/verification/`, including `fsm_counter_mc2.yaml` for `nnc-gen -t mc2`
+- verification examples under `examples/verification/`, including `fsm_counter_mc2.yaml` for `nnc-verify` and `nnc-gen -t mc2`
 
 ## Notes
 - Top-level `name` and `description` are treated as metadata and ignored by Verilog generation.

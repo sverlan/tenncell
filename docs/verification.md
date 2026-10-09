@@ -6,13 +6,15 @@
 >
 > Implemented so far:
 >
-> - parsing and validation of the `verification` section (generic properties are
->   parsed only as `id`/`targets` stubs);
+> - parsing and validation of the `verification` section, including generic
+>   property kinds, bounds, and conditions bound to the model (sections 4.1-4.6);
 > - `${name}` placeholders in raw code, resolved against the model;
-> - MC2 raw generation with `nnc-gen -t mc2` (section 7.3).
+> - MC2 generation with `nnc-gen -t mc2` (section 7.3), for raw entries and
+>   generic properties;
+> - the `native` checker (section 6.6) and its command `nnc-verify`, which
+>   simulates the model or reads a recorded trace.
 >
-> Not implemented yet: generic property kinds, the `native` checker, `sva`, and
-> trace export of internal variables.
+> Not implemented yet: `sva`, and trace export of internal variables.
 
 ## At a glance
 
@@ -199,6 +201,9 @@ Unknown keys are errors.
 
 ## 4. Generic properties
 
+**Implemented** (parsing and binding; checked by `native`, translated by `mc2`).
+A user guide with worked examples is `docs/generic_properties.md`.
+
 Generic properties have TENNCell semantics and are translated by each backend
 that supports them.
 
@@ -369,6 +374,9 @@ backends:
 
 ## 6. Trace semantics
 
+**Implemented** in `native` (section 6.6) and in the `mc2` translation
+(section 7.3.1).
+
 These rules apply to every check over a finite trace: `native`, `mc2`, and `sva`
 in simulation mode.
 
@@ -427,6 +435,38 @@ Obligations fall into two groups:
 If a property references a variable that is absent from a supplied trace, this
 is an **error**, never a silent `pass`.
 
+### 6.6 Rows, edge cases, and reporting (native, implemented)
+
+- **Time is row position.** `after`, `within`, and `from_step` count trace
+  rows, exactly as MC2's `X` counts rows. Step or time labels (the first trace
+  column, if any) are only used for reporting. Labels must be finite and
+  strictly increasing.
+- **Empty range** (`from_step` past the end of the trace, that is, at least the
+  number of rows): `always`, `never`, and
+  trigger kinds pass; `eventually` and `eventually` + `within` fail under
+  `strict` and are `pending` under `weak`; `cover` is `not_covered`.
+- **`then_always` is "hold throughout" under both semantics.** Rows past the
+  end are never checked, so a trigger too close to the end for `t+n` to exist
+  passes even under `strict`.
+- **What a failure reports.** The trigger row (for trigger kinds) and the row
+  where the failure became known, each with its label:
+
+  | Kind | Reported row |
+  |---|---|
+  | `always`, `never`, `then_always` | first violating row |
+  | `when` / `then` / `after: n` | `t+n` |
+  | `when` / `then` / `within: [a, b]` | `t+b` |
+  | `eventually` + `within: [a, b]` | `from_step+b` |
+  | strict end-of-trace failure | last row |
+
+  When several obligations fail, the one with the earliest reported row is
+  reported; ties go to the earliest trigger. Pending results list every open
+  obligation's trigger row and label.
+- **Errors, not failures.** A missing column, a non-finite value in a column a
+  checked property uses, or an error while evaluating a condition (for example
+  `sqrt` of a negative value) is an operational error naming the property, the
+  condition, the row, and the label.
+
 ## 7. Backend contracts
 
 ### 7.1 Common rules
@@ -441,6 +481,7 @@ is an **error**, never a silent `pass`.
 
 ### 7.2 `native`
 
+- **Implemented:** `nnc-verify` (see `rules.md`, section "nnc-verify").
 - The built-in checker. It runs in-process and needs no external tool.
 - It either simulates the model through `NncSystem` or checks a supplied trace.
   How the run or trace is selected is an execution concern and is out of scope
@@ -458,22 +499,29 @@ is an **error**, never a silent `pass`.
 
 - Trace-based file generator for the MC2 Monte Carlo model checker
   (PLTLc, Donaldson and Gilbert).
-- **Implemented:** `nnc-gen -t mc2 model.yaml` emits, for raw entries:
-  - `<stem>.mc2.pltl`: the PLTLc queries, one per line (later also the
-    targeted generic properties);
+- **Implemented:** `nnc-gen -t mc2 model.yaml` emits, for raw entries and
+  generic properties (section 7.3.1):
+  - `<stem>.mc2.pltl`: the PLTLc queries, one per line: raw entries first, then
+    generic properties, each in YAML order;
   - `<stem>.mc2.columns`: the trace columns those queries need, in first-use
     order;
   - `<stem>.mc2.ids`: the entry IDs, in query order.
-- It fails if the root file has no `mc2.raw` entries, and warns when generic
-  properties that target `mc2` are skipped.
-- **Trace workflow (implemented):** `nnc-sim` traces contain only output
-  variables, so every variable a query uses must be declared as a root output.
-  `nnc-gen -t mc2` warns about columns that are not root outputs. Root inputs
-  and imported inputs/outputs cannot be traced yet. MC2 needs a leading time
-  column, which `nnc-sim --csv-include-step` adds in IO mode (compute-mode CSV
-  always starts with `step`):
-  `nnc-sim model.yaml in.csv trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "`,
-  then `java -jar MC2v2.0beta2.jar stoch trace.txt model.mc2.pltl`.
+- It fails if nothing is emitted (no `mc2.raw` entries and no generic property
+  for MC2).
+- **Trace workflow (implemented):** traces come from one of two sources.
+  - **`nnc-sim`** writes only root output variables, so every variable a query
+    uses must be declared as a root output; root inputs and imported
+    inputs/outputs cannot be traced. MC2 needs a leading time column, which
+    `nnc-sim --csv-include-step` adds in IO mode (compute-mode CSV always starts
+    with `step`):
+    `nnc-sim model.yaml in.csv trace.txt --csv-include-step --csv-include-initial --csv-delimiter " "`,
+    then `java -jar MC2v2.0beta2.jar stoch trace.txt model.mc2.pltl`.
+  - **The Webots controller's CSV log** (`webots.csv`) records any listed
+    variable, including inputs. For MC2 it needs `include_step: true` (so the
+    first column is `_step`) and `delimiter: " "` (or `";"` with `-snoopy`).
+  - `nnc-gen -t mc2` warns about columns that neither source records. With a
+    `webots.csv` section, it also warns when `include_step` is false or the
+    delimiter is not a space, tab, or `;`.
 - **Query file format** (MC2 user manual, checked against MC2 v2.0beta2):
   - plain text, **one query per line**; blank lines are ignored, and CRLF or LF
     line endings both work;
@@ -494,6 +542,23 @@ is an **error**, never a silent `pass`.
   - query files are read in the JVM default encoding. `nnc-gen` writes UTF-8,
     which Java 18+ reads by default; with older Java, run
     `java -Dfile.encoding=UTF-8 -jar ...` so the NOT sign is decoded.
+- **Semantics to know when writing MC2 queries** (tested with MC2 v2.0beta2;
+  the generic-properties translation must follow them). Below, `<not>` stands
+  for the NOT sign U+00AC, which is what the query file must contain:
+  - **`->` with `X` is broken.** `a -> b` evaluates to false whenever `b`
+    contains `X`, even when `a` is false: `P=?[ [x] = 5 -> X(true) ]` gives
+    `0.0` on a trace where `x` is never 5. Write `<not>(a) V b` instead. `->` works correctly with `F`, `G`, and plain
+    comparisons.
+  - **The end of the trace is strict.** `X` past the last step is false, and
+    an unmet `F` is false, matching `trace_semantics: strict`. The weak form of
+    "after n steps" adds `V <not>X(...X(true)...)` with n `X`s, so a trigger in the
+    last n steps does not count as a failure.
+  - **There is no bounded `F`.** "Within `[a, b]` steps" must be written as
+    `X^a(p) V ... V X^b(p)`, nested `X`s. This is practical only for small
+    bounds.
+  - **"Always" needs `G`.** `F(a ^ X(b))` only asks whether the pattern happened
+    at least once. A rule "whenever `a`, then `b` next" is
+    `G(<not>(a) V X(b))`.
 - **Raw code rules:**
   - each raw entry is exactly one query. Code that still spans several lines
     after the final-newline strip (section 5.3) is an error. Long queries can use
@@ -521,9 +586,51 @@ is an **error**, never a silent `pass`.
     the header. The `-snoopy` parser rejected every multi-run layout tried;
   - `det` mode expects the BioNessie format and does not read these traces, so
     a single deterministic TENNCell run is checked with `stoch`.
-- Supported generic kinds are fixed in the generic-properties slice.
-  Unsupported kinds follow the targeting rules in section 4.3.
 - Options: none in v1. Run counts and seeds are execution configuration.
+
+#### 7.3.1 Generic properties (implemented)
+
+- **Selection.** Properties without `targets`, or listing `mc2`, are translated.
+  MC2 supports every kind but **no function calls**: a property with a call is
+  an error when it lists `mc2` in `targets`, and is otherwise skipped with a
+  warning. Properties targeting only other backends are omitted silently.
+- **IDs.** An emitted property ID must differ from every `mc2.raw` ID. The check
+  runs after filtering, so a native-only property may reuse a raw MC2 ID.
+- **Notation.** `X^k(p)` is k nested `X` (`X^0(p) = p`); `W_k = ¬X^k(true)`,
+  "the trace ends within k rows"; `C(p)` is the translated condition;
+  `R(p, w) = p V X(p V X(... X(p)))` with `w` nested `X`, which is
+  `X^0(p) V ... V X^w(p)` in linear size.
+- **Bodies.** Every query is `P=?[ <wrapped body> ]`:
+
+  | Kind | Strict body | Weak body | `from_step f > 0` wrapper |
+  |---|---|---|---|
+  | `always P` | `G(C(P))` | same | `W_f V X^f(body)` |
+  | `never P` | `G(¬(C(P)))` | same | `W_f V X^f(body)` |
+  | `eventually P` | `F(C(P))` | same: pending cannot be expressed, so MC2 checks strictly (warning) | `X^f(body)` |
+  | `eventually P within [a,b]` | `X^a(R(C(P), b-a))` | strict body `V W_b` (none for `b = 0`) | strict: `X^f(body)`; weak: `W_f V X^f(weak body)` |
+  | `when T then P after n` | `G(¬(C(T)) V X^n(C(P)))` | adds `V W_n` inside `G` (none for `n = 0`) | `W_f V X^f(body)` |
+  | `when T then P within [a,b]` | `G(¬(C(T)) V X^a(R(C(P), b-a)))` | adds `V W_b` inside `G` (none for `b = 0`) | `W_f V X^f(body)` |
+  | `when T then_always P after n` | `G(¬(C(T)) V W_n V X^n(G(C(P))))` (no `W_0`) | same | `W_f V X^f(body)` |
+  | `cover P` | `F(C(P))` | same | `X^f(body)`; covered when the result is > 0 |
+
+- The wrappers make `f >= L` agree with the native table: safety and trigger
+  kinds give 1; strict `eventually`, strict bounded `eventually`, and `cover`
+  give 0; weak bounded `eventually` gives 1.
+- **Weak approximation.** MC2 has no `pending`. With `weak`, bounded
+  `eventually` and response properties give 1 when an obligation is still open
+  at the end, and unbounded `eventually` gives 0; `nnc-gen` warns about both.
+  With a zero bound (`after: 0`, `within: [0, 0]`, and for bounded `eventually`
+  also `from_step: 0`), nothing can stay open, the weak query is exact, and
+  there is no warning.
+- **Conditions.** Variables render as `[name]`, imported IO as `[alias__port]`,
+  aliases as their target, constants and FSM states as numbers (negative ones
+  as `(-n)`). `&&` becomes `^`, `||` becomes `V`, `!x` becomes `¬(x)`, `==`
+  becomes `=`, unary minus becomes `-(x)`; `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`,
+  `*`, `/`, `true`, and `false` are kept. Every binary operation is
+  parenthesized. `->` is never emitted, because of the MC2 bug with `X`.
+- **Agreement with `native`** is tested on recorded traces with the MC2 jar
+  (opt-in): `pass`/`covered` give 1, `fail`/`not_covered` give 0, and weak
+  `pending` gives 1, except unbounded `eventually`, which gives 0.
 
 ### 7.4 `sva`
 

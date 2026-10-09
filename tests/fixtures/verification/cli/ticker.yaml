@@ -1,0 +1,16 @@
+# nnc-verify CLI fixture: an autonomous counter, x = row number.
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verification:
+  properties:
+    - id: at_most_five
+      always: x <= 5
+    - id: covers_three
+      cover: x == 3

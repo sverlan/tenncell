@@ -1,0 +1,73 @@
+# Test-owned MC2 fixture: generic properties of every kind translated to MC2.
+# root_check calls a function (skipped with a warning); native_only targets
+# native and shares its ID with an MC2 raw entry (allowed, never both emitted).
+module:
+  name: generic_mc2
+
+constants:
+  LIMIT: 4
+  OFFSET: -1.5
+
+cells:
+  - id: 1
+    contents:
+      - mode = 0
+      - level = 0
+      - request = 0
+      - grant = 0
+    input: [request]
+    output: [mode, level, grant]
+
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: request > 0
+              then:
+                - BUSY -> mode
+      - BUSY:
+          rules:
+            - 1 -> grant
+            - IDLE -> mode
+
+verification:
+  properties:
+    - id: safe
+      always: mode != ctrl.BUSY || grant >= 0
+    - id: no_underflow
+      never: -level < OFFSET * 2
+    - id: served
+      eventually: grant == 1
+    - id: served_soon
+      eventually: grant == 1
+      within: [1, 3]
+    - id: responds
+      when: request > 0
+      then: grant == 1
+      after: 1
+    - id: responds_soon
+      when: request > 0 && mode == ctrl.IDLE
+      then: grant == 1
+      within: [0, 2]
+    - id: settles
+      when: grant == 1
+      then_always: mode == ctrl.IDLE
+      after: 1
+    - id: sees_busy
+      cover: mode == ctrl.BUSY
+    - id: late_check
+      always: level <= LIMIT
+      from_step: 2
+    - id: root_check
+      always: sqrt(level) >= 0
+    - id: raw_q
+      always: abs(level) < 10
+      targets: [native]
+  backends:
+    mc2:
+      raw:
+        - id: raw_q
+          code: "P=?[ G([${level}] >= 0) ]"

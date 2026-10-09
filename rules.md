@@ -327,6 +327,7 @@
 ## Python Backend And Simulator
 - Existing standalone YAML files continue to work with the Python backend and simulator.
 - Imported TENNCell modules are supported by the Python backend and runtime simulator.
+- The simulator and the `native` verification checker evaluate expressions with the same shared evaluator (`nnc.model.evaluation`): same operators, operand order, function-call order, and short-circuit `&&`/`||`; only the source of values differs.
 - Python transformation emits one `.py` file for the full import closure, with internal helper classes plus one public root `NncSystem` wrapper.
 - Generated Python supports every default function of the `MathFunctions` registry:
   - `pi` and `e` are emitted as `math.pi` and `math.e`;
@@ -368,7 +369,13 @@
 - Backend keys: `native` accepts `trace_semantics`; `mc2` accepts `trace_semantics` and `raw`; `sva` accepts `trace_semantics` and `mode` (`simulation`, `formal`, or `both`; default `simulation`).
 - `native.raw` is rejected. `sva.raw` is rejected until the SVA backend is implemented.
 - Each `mc2.raw` entry has a required identifier `id`, an optional string `description`, and a required string `code`. Raw IDs are unique within `mc2.raw`. Exactly one final newline is stripped from `code`.
-- `properties` is a list of mappings with a required identifier `id` (unique among properties) and an optional `targets` list of backend names. Generic property kinds are not validated or emitted yet.
+- `properties` is a list of generic properties. Each has a required identifier `id` (unique among properties), and optional `description`, `targets` (backend names), and `from_step` (non-negative integer, default 0). Unknown keys are rejected; `probability` is reserved and rejected.
+- The property kind is given by the exact set of kind keys: `always`; `never`; `eventually`; `eventually` + `within`; `when` + `then` + `after`; `when` + `then` + `within`; `when` + `then_always` (+ optional `after`, default 0); `cover`. Any other combination is rejected with a message naming the problem (for example `'when' + 'then' needs exactly one of 'after' or 'within'`).
+- `after` is a non-negative integer and `within` is `[a, b]` with integers `0 <= a <= b`. Offsets count trace rows.
+- Conditions are TENNCell guard expressions (or YAML `true`/`false`); nested properties are rejected. They are parsed against the model like rule guards, and every name must resolve: local variables, constants, aliases (to their target), FSM states (`ctrl.DONE`), and imported inputs/outputs (`sensor0.level`). Errors point to the condition's line.
+- A qualified name that is both an FSM state and an imported input/output (an import alias and an FSM with the same name) is rejected as ambiguous, as for raw `${name}` placeholders.
+- Conditions may call only unmodified built-in functions. `random()` is rejected because it is nondeterministic, and functions registered or overridden at runtime are rejected.
+- Binding records, for each property, the trace columns its conditions read (trigger first, in first-use order; imported inputs/outputs as `alias__port`; constants and FSM states are not columns) and the functions it uses. Backends use this to check whether they support a property.
 - Include merging concatenates `verification.properties` and `verification.backends.mc2.raw`.
 
 ### Verification Placeholders
@@ -379,25 +386,60 @@
 - `verification.environment` keys must be root input variables.
 - Binding errors name the raw entry and point to the YAML line of its `code`.
 
-### MC2 Raw Backend
-- `nnc-gen -t mc2` generates MC2 query files from `verification.backends.mc2.raw` of the root YAML file. It does not run MC2.
+### Native Checker
+- `nnc.verification.generic_properties.native.check_properties()` checks generic properties on a finite `Trace` with the built-in `native` semantics; it is the semantic reference for other backends.
+- A `Trace` has one label per row (an `int` or `float` step or time value) and one mapping of column values per row. It must be non-empty, labels must be finite and strictly increasing, and every row must have the same columns.
+- Time is row position: `after`, `within`, and `from_step` count rows (as MC2's `X` counts rows). Labels are only used for reporting.
+- Kinds, over rows `from_step..L-1`, where every trigger row opens its own obligation:
+  - `always P` / `never P`: fail at the first violating row; otherwise pass (also when the range is empty).
+  - `eventually P`: pass if P holds on some row; otherwise open at the end.
+  - `eventually P within [a, b]`: P must hold on some row of `from_step+a..from_step+b`; a completed window without P fails at its last row, a window reaching past the end is open.
+  - `when T then P after n`: P must hold on exactly row `t+n`; it fails at `t+n`, or is open if `t+n` is past the end.
+  - `when T then P within [a, b]`: P must hold on some row of `t+a..t+b`; a completed window without P fails at `t+b`, a window reaching past the end is open unless P was already seen.
+  - `when T then_always P after n`: P must hold on every row from `t+n` to the end. This is "hold throughout" under both semantics: rows past the end are never checked, so a trigger too close to the end passes.
+  - `cover P`: `covered` if P holds on some row, else `not_covered`, under both semantics.
+  - Properties with a trigger but no trigger row pass.
+- Open obligations at the end of the trace fail at the last row under `strict` and are `pending` under `weak`. The property result is the worst of its obligations (`fail` > `pending` > `pass`); a failure reports the obligation with the earliest detection row, ties going to the earliest trigger, with both row positions and labels.
+- `trace_semantics` defaults to the `native` backend's effective setting (its own override, else the global value); an explicit value other than `strict` or `weak` raises `VerificationError`.
+- Properties whose `targets` exclude `native` are reported as `skipped`, and their columns are not required.
+- A column used by a checked property must exist and hold finite values in every row; otherwise the check raises `VerificationError`. Errors while evaluating a condition (for example `sqrt` of a negative value) also raise `VerificationError`, naming the property, the condition role, the row, and the label. They are operational errors, never property failures.
+
+### nnc-verify
+- `nnc-verify MODEL.yaml (--trace FILE | --inputs FILE | --steps N)` checks the model's generic verification properties with the `native` checker. Exactly one of `--trace`, `--inputs`, `--steps` is required; a missing or second source, or an invalid argument value type, is a usage error with exit status `2`.
+- `--steps N` simulates a model without inputs: trace row 0 is the initial state, followed by N steps (N+1 rows). It is an error for a model with inputs.
+- `--inputs FILE` simulates a model with inputs: row 0 is the initial state, and input record k drives the transition to row k (N records give N+1 rows). The header must name each root input exactly once (unknown, missing, duplicate, or empty column names are errors). It is an error for a model without inputs.
+- Simulated rows contain every local variable (internal variables included) and imported modules' inputs and outputs as `alias__port`.
+- `--trace FILE` checks a recorded trace: the model's rules are not run; the model only supplies the properties, names, constant and FSM-state values, aliases, and required columns. A header line is required. If the first column is named `step`, `_step`, `time`, or `Time`, it gives the row labels; otherwise rows are labelled from `--first-step` (default 0). A step-named column that is not first is ordinary data.
+- `--delimiter` (default comma) applies to `--trace` and `--inputs` files. It must be a single character; `" "` means any run of whitespace. Any other value is a usage error (exit `2`). Other delimiters use CSV parsing (quoted fields allowed); malformed CSV is an error with its line. Only blank or whitespace-only lines are skipped; a line of empty fields such as `,,,` is a data row and is validated.
+- Only columns used by checked properties are read as numbers; other columns (and columns used only by skipped properties) are ignored. Empty or duplicate header column names, rows with a different number of fields, non-numeric used values or labels, non-increasing or non-finite labels, and an empty trace are errors with the file and line where known. When all labels are integral and an increment differs from 1, a warning is printed (offsets count rows, not steps). Integral labels (`3` or `3.0`) are reported as integers.
+- Output is a table (`id`, `kind`, `result`, `trigger`, `reported`, `open`), or JSON with `--json` keeping every `PropertyResult` field and the statuses `pass`, `fail`, `pending`, `covered`, `not_covered`, and `skipped`.
+- Exit status: `0` when no property fails (`pass`, `pending`, `covered`, `not_covered`, and `skipped` do not fail); `1` when a property fails or on an operational error (bad model or trace, missing column, a model without generic properties, an evaluation error); `2` for usage errors.
+
+### MC2 Backend
+- `nnc-gen -t mc2` generates MC2 query files from `verification.backends.mc2.raw` and the generic `verification.properties` of the root YAML file. It does not run MC2.
 - For each root file it writes three files, each line ending with a newline:
-  - `<stem>.mc2.pltl`: one rendered MC2 query per raw entry, in YAML order, with no comments;
-  - `<stem>.mc2.ids`: the raw entry IDs, in the same order as the queries;
-  - `<stem>.mc2.columns`: the trace columns the queries reference, in first-use order.
+  - `<stem>.mc2.pltl`: one rendered MC2 query per raw entry, in YAML order, then one per emitted generic property, in YAML order, with no comments;
+  - `<stem>.mc2.ids`: the raw entry and property IDs, in the same order as the queries;
+  - `<stem>.mc2.columns`: the trace columns the queries reference, in first-use order (raw entries first, no duplicates).
 - `--output-suffix` is appended to `<stem>` for all three files.
-- If the root file has no `mc2.raw` entries, generation fails with "No MC2 raw verification entries found".
+- If nothing is emitted (no `mc2.raw` entries and no generic property for MC2), generation fails with "No MC2 verification entries found".
 - Each raw entry must be exactly one non-empty single-line query after the final newline is stripped; YAML folded style `>-` joins long queries onto one line.
 - Placeholders render as bare names; users write the MC2 brackets (`[${x}]`, `d[${x}]`, `max([${x}])`):
   - a local variable renders as its name and is listed in `.mc2.columns`;
   - an imported input or output `alias.port` renders as `alias__port` and is listed in `.mc2.columns`;
   - an alias renders as its target;
   - constants and FSM states render as numeric literals without exponent notation (`3`, `2.5`, `0.00001`) and are not listed as columns.
-- Generic `verification.properties` are not emitted yet. When properties target `mc2` (explicitly, or by having no `targets`), `nnc-gen` prints a warning to stderr: "generic verification properties are not emitted by the MC2 raw backend yet: <ids>".
+- Generic properties without `targets`, or whose `targets` include `mc2`, are translated to MC2; properties targeting only other backends are omitted silently.
+- MC2 queries cannot call functions. A property with a function call is an error when its `targets` list `mc2`, and is otherwise skipped with the warning "generic verification properties skipped for MC2: <id> (calls <functions>; MC2 queries cannot call functions)".
+- An emitted property ID equal to an `mc2.raw` ID is an error. The check runs after filtering, so a property not emitted for MC2 (for example `targets: [native]`) may share an ID with a raw entry.
+- Each property becomes one `P=?[...]` query (translation table in `docs/verification.md` section 7.3). Conditions render with every binary operation parenthesized: variables as `[name]`, imported IO as `[alias__port]`, aliases as their target, constants and FSM states as numbers (negative ones as `(-n)`), `&&` as `^`, `||` as `V`, `!` as `¬(...)` (U+00AC), `==` as `=`, unary minus as `-(...)`. `->` is never emitted.
+- `X^k` is k nested `X`; `¬X^k(true)` ("the trace ends within k rows") makes `from_step` past the end of the trace and the weak end-of-trace forms agree with `native`. A `within: [a, b]` window renders as `X^a(p V X(p V ... X(p)))`, linear in `b - a`.
+- The MC2 query uses the `mc2` backend's effective `trace_semantics`. With `weak`, `nnc-gen` warns that MC2 counts obligations still open at the end of the trace as satisfied for bounded `eventually` and response properties whose obligations can stay open (an upper bound or delay above 0, or `from_step` above 0 for bounded `eventually`; native reports `pending`), and that MC2 checks unbounded `eventually` strictly (an unmet condition gives 0).
 - `nnc-sim` traces contain only output variables. When a column in `.mc2.columns` is not a root output variable (an internal variable, a root input, or an imported input/output), `nnc-gen` prints a warning to stderr: "MC2 trace columns are not root outputs, so nnc-sim traces will not contain them: <columns>". Declaring a local variable as an output only exposes it and does not change simulation results.
+- When the model has a `webots.csv` section, the Webots controller's CSV log is a second trace source: a column needs no warning if it is a root output or listed in `webots.csv.variables`. Columns in neither give the warning "MC2 trace columns are neither root outputs (nnc-sim traces) nor listed in webots.csv.variables (Webots CSV log): <columns>". `nnc-gen` also warns when `webots.csv.include_step` is false (MC2 reads the first column as time) or when `webots.csv.delimiter` is not a space, tab, or `;`.
 - MC2 reads the first trace column as time, so MC2 traces from IO mode need `nnc-sim --csv-include-step`.
 - MC2 v2.0beta2 accepts `^` (and), uppercase `V` (or), `->`/`=>` (implies), and the NOT sign U+00AC; `!` is only valid in `!=`. Raw MC2 code is passed through unchanged, so `nnc-gen` does not rewrite these operators.
-- An opt-in functional test runs generated queries and `nnc-sim` traces through MC2 when `NNC_MC2_JAR` points to the MC2 jar and `java` is on `PATH`; otherwise it is skipped.
+- Opt-in functional tests run generated queries and `nnc-sim` traces through MC2, and check that MC2 agrees with `native` on generic properties (pass and covered give 1, fail and not_covered give 0, weak pending gives 1 except unbounded `eventually`, which gives 0), when `NNC_MC2_JAR` points to the MC2 jar and `java` is on `PATH`; otherwise they are skipped.
 - `BaseTransformer.transform_files()` returns output files keyed by suffix; by default it emits one file from `transform()` and `get_file_extension()`. `nnc-gen` writes every returned file and prints transformer warnings to stderr.
 
 ## FPGA Examples

@@ -13,7 +13,8 @@ should verify these promises, not internal implementation details.
 - `tests/unit_tests/transformers/python/` covers Python backend behavior.
 - `tests/unit_tests/transformers/verilog/` covers Verilog backend behavior.
 - `tests/unit_tests/transformers/webots/` covers Webots backend behavior.
-- `tests/unit_tests/transformers/mc2/` covers MC2 raw query generation.
+- `tests/unit_tests/transformers/mc2/` covers MC2 query generation from raw entries and generic properties.
+- `tests/unit_tests/verification/test_mc2_translation.py` covers the MC2 translation of every generic property kind (strict and weak, `from_step`, bounds) and of conditions.
 - `tests/unit_tests/verification/` covers verification section parsing, placeholders, and reference binding.
 - `tests/cli_tests/` covers CLI behavior and command-line contract.
 
@@ -64,7 +65,7 @@ should verify these promises, not internal implementation details.
 - FSM sugar is lowered into generated Verilog state logic and constants.
 - `WebotsTransformer` emits a standalone Python controller for Webots.
 - Webots generation requires a `webots` YAML section with bindings for declared TENNCell inputs and outputs.
-- `Mc2Transformer` emits `.mc2.pltl`, `.mc2.ids`, and `.mc2.columns` from `mc2.raw`, requires at least one raw entry, rejects empty or multi-line queries, and warns about skipped generic properties and about columns that are not root outputs.
+- `Mc2Transformer` emits `.mc2.pltl`, `.mc2.ids`, and `.mc2.columns` from `mc2.raw` followed by the generic properties for MC2, requires at least one emitted entry, rejects empty or multi-line queries, function calls in properties targeting `mc2`, and property IDs equal to emitted raw IDs, and warns about skipped generic properties, weak-semantics approximations, and about columns that are not root outputs; with a `webots.csv` section, only about columns that are neither root outputs nor in `webots.csv.variables`, and about a Webots log without `include_step` or with a delimiter MC2 cannot read.
 
 ## Verification Contracts
 
@@ -72,7 +73,11 @@ should verify these promises, not internal implementation details.
 - Unknown keys, invalid `trace_semantics`, malformed `environment` entries, and reserved or unknown backend names are rejected with YAML file and line.
 - `native.raw` and `sva.raw` are rejected; `mc2.raw` entries require an identifier `id` and string `code`, and lose exactly one final newline.
 - Raw IDs are unique within `mc2.raw`; property IDs are unique among `properties`.
-- Generic properties are parsed only as stubs (`id`, `targets`).
+- Generic properties are parsed into `GenericProperty` with their kind, condition, trigger, bounds, `from_step`, and `targets`; every invalid key combination and bound is rejected with its YAML line.
+- `bind_property()` parses property conditions against the model, rejects unknown names, `random()`, and runtime-registered or overridden functions, and records the trace columns and functions each property uses.
+- `check_properties()` implements the native truth table for every kind under strict and weak semantics (row positions, `from_step`, empty ranges, overlapping triggers, persistence end cases, reported rows and labels), reports non-native targets as `skipped`, and raises `VerificationError` for missing or non-finite used columns and for condition evaluation errors.
+- `Trace` rejects empty traces, length mismatches, non-finite or non-increasing labels, and rows with different columns.
+- `evaluate_expression()`/`evaluate_boolean()` give identical results for bound variables and row values, call functions left to right, and short-circuit `&&`/`||`.
 - Include merging concatenates `verification.properties` and `verification.backends.mc2.raw`, keeping source locations.
 - `parse_template()` splits raw code into text and `${name}` placeholders, handles `$${` escapes, and rejects unclosed, empty, or invalid placeholders.
 - `resolve_reference()` resolves variables, constants, FSM states, imported inputs/outputs, and aliases (to their target), and rejects unknown and ambiguous names.
@@ -85,6 +90,7 @@ should verify these promises, not internal implementation details.
 - Exit status is `0` on full success and `1` when any file fails.
 - Invalid transformer types and missing files produce clear error messages.
 - `nnc-gen -t mc2` writes the three MC2 files with `--output-suffix`, prints transformer warnings to stderr, and continues the batch after an invalid file.
+- `nnc-verify` simulates (`--steps`: N+1 rows for autonomous models; `--inputs`: N records give N+1 rows) or reads a recorded `--trace` (step-column labels, `--first-step`, whitespace delimiter, unused columns ignored), reports every property status in a table or JSON, and exits `0` without failures, `1` on a failure or operational error, `2` on usage errors.
 - `nnc-sim --csv-include-step` prepends a `step` column to IO-mode CSV (initial row `0`, after-step rows from `1`); without it IO mode keeps output-only columns.
 
 ## Notes

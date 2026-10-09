@@ -33,6 +33,7 @@ Repository = "https://github.com/sverlan/tenncell"
 [project.scripts]
 nnc-sim = "nnc.__main__:main"
 nnc-gen = "nnc.cli_transform:main"
+nnc-verify = "nnc.cli_verify:main"
 [tool.pdm.version]
 #source = "file"
 #path = "src/nnc/_version.py"
@@ -48,7 +49,7 @@ test = "pytest --cov=nnc --cov-report=xml --cov-report=term-missing"
 builddoc = "sphinx-build -b html docs/source build/docs"
 lint = "ruff check --select F401,F841 src/nnc"
 format = "ruff format src tests/unit_tests tests/functional_tests tests/cli_tests"
-typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/verification src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py"
+typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/verification src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py src/nnc/cli_verify.py"
 
 
 [tool.coverage.run]
