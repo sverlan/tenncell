@@ -1,0 +1,9 @@
+# nnc-verify CLI fixture: a model without generic verification properties.
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x

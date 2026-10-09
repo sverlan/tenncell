@@ -3,6 +3,12 @@
 This file records the current unit-test contract surface for TENNCell. The tests
 should verify these promises, not internal implementation details.
 
+## Test Inputs
+
+- Complete models, scenario traces, and golden outputs are checked-in fixtures under `tests/fixtures/`, each with a short YAML comment naming the scenario it serves.
+- Inline YAML or CSV is used only for validation and error tables: a few lines per case, next to the expected message (often with its line number).
+- Truth-table tests of the native checker and the MC2 translation build properties and traces in Python, on the shared fixture `tests/fixtures/verification/pt_model.yaml`.
+
 ## Contract Map
 
 - `tests/unit_tests/model/` covers the core runtime model.
@@ -90,7 +96,7 @@ should verify these promises, not internal implementation details.
 - Exit status is `0` on full success and `1` when any file fails.
 - Invalid transformer types and missing files produce clear error messages.
 - `nnc-gen -t mc2` writes the three MC2 files with `--output-suffix`, prints transformer warnings to stderr, and continues the batch after an invalid file.
-- `nnc-verify` simulates (`--steps`: N+1 rows for autonomous models; `--inputs`: N records give N+1 rows) or reads a recorded `--trace` (step-column labels, `--first-step`, whitespace delimiter, unused columns ignored), reports every property status in a table or JSON, and exits `0` without failures, `1` on a failure or operational error, `2` on usage errors.
+- `nnc-verify` simulates (`--steps`: N+1 rows for autonomous models; `--inputs`: N records give N+1 rows) or reads a recorded `--trace` (step-column labels, `--first-step`, `--no-step-column`, `--skip-lines`, whitespace delimiter, unused and empty-named columns ignored, a PeP-style log fixture), reports every property status in a table or JSON, and exits `0` without failures, `1` on a failure or operational error, `2` on usage errors.
 - `nnc-sim --csv-include-step` prepends a `step` column to IO-mode CSV (initial row `0`, after-step rows from `1`); without it IO mode keeps output-only columns.
 
 ## Notes

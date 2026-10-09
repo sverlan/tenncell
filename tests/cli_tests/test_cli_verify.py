@@ -168,16 +168,8 @@ def test_trace_errors(tmp_path, text, message):
     assert message in err
 
 
-def test_evaluation_error_is_an_operational_error(tmp_path):
-    model = _write(
-        tmp_path,
-        "model.yaml",
-        "cells:\n  - id: 1\n    contents:\n      - x = 0\n    output: [x]\n"
-        "rules:\n  - x - 1 -> x\n"
-        "verification:\n  properties:\n    - id: root\n      always: sqrt(x) >= 0\n",
-    )
-
-    code, _, err = _run(str(model), "--steps", "2")
+def test_evaluation_error_is_an_operational_error():
+    code, _, err = _run(str(FIXTURES / "sqrt_error.yaml"), "--steps", "2")
 
     assert code == 1
     assert (
@@ -185,31 +177,15 @@ def test_evaluation_error_is_an_operational_error(tmp_path):
     )
 
 
-def test_model_without_properties_is_an_error(tmp_path):
-    model = _write(
-        tmp_path,
-        "model.yaml",
-        "cells:\n  - id: 1\n    contents:\n      - x = 0\n    output: [x]\n"
-        "rules:\n  - x + 1 -> x\n",
-    )
-
-    code, _, err = _run(str(model), "--steps", "1")
+def test_model_without_properties_is_an_error():
+    code, _, err = _run(str(FIXTURES / "no_properties.yaml"), "--steps", "1")
 
     assert code == 1
     assert "No generic verification properties found" in err
 
 
-def test_pending_does_not_fail(tmp_path):
-    model = _write(
-        tmp_path,
-        "model.yaml",
-        "cells:\n  - id: 1\n    contents:\n      - x = 0\n    output: [x]\n"
-        "rules:\n  - x + 1 -> x\n"
-        "verification:\n  trace_semantics: weak\n  properties:\n"
-        "    - id: big\n      eventually: x > 100\n",
-    )
-
-    code, out, _ = _run(str(model), "--steps", "2")
+def test_pending_does_not_fail():
+    code, out, _ = _run(str(FIXTURES / "weak_pending.yaml"), "--steps", "2")
 
     assert code == 0
     assert "pending" in out and "end of trace" in out
@@ -255,16 +231,9 @@ def test_missing_import_is_an_error(tmp_path):
 
 
 def test_first_label_column_is_also_data(tmp_path):
-    model = _write(
-        tmp_path,
-        "model.yaml",
-        "cells:\n  - id: 1\n    contents:\n      - time = 0\n    output: [time]\n"
-        "rules:\n  - time + 1 -> time\n"
-        "verification:\n  properties:\n    - id: early\n      always: time < 20\n",
-    )
     trace = _write(tmp_path, "trace.csv", "time\n0\n10\n20\n")
 
-    results = _json(str(model), "--trace", str(trace))
+    results = _json(str(FIXTURES / "time_variable.yaml"), "--trace", str(trace))
 
     assert results["early"]["status"] == "fail"
     assert results["early"]["reported_row"] == 2
@@ -324,7 +293,6 @@ def test_gap_warning(tmp_path, labels, warned):
 @pytest.mark.parametrize(
     ("text", "message"),
     [
-        ("step,t,,x,done\n0,0,0,0,0\n", "trace.csv:1: column 3 has an empty name"),
         ("step,t,x,done\n,,,\n", "trace.csv:2: step label is not a number"),
         ("step,t,x,done\n0,0,\x00,0\n", "trace.csv:2"),
     ],
@@ -336,6 +304,130 @@ def test_more_trace_errors(tmp_path, text, message):
 
     assert code == 1
     assert message in err
+
+
+# --- logs from other tools (PeP, Webots) ---------------------------------------
+
+# pep_style.csv mimics a PeP/Webots controller log: a preamble line, a `step`
+# column that is constant (the Webots time step), comma-plus-space delimiters,
+# an empty separator column, and enzyme columns after it.
+PEP_STYLE = FIXTURES / "pep_style.csv"
+
+
+def test_pep_style_log_with_options():
+    results = _json(
+        str(COUNTER), "--trace", str(PEP_STYLE), "--skip-lines", "1", "--no-step-column"
+    )
+
+    # Rows are labelled by position: 0, 1, 2, 3.
+    assert results["x_nonnegative"]["status"] == "fail"
+    assert results["x_nonnegative"]["reported_row"] == 3
+    assert results["x_nonnegative"]["reported_label"] == 3
+    assert results["reaches_done"]["status"] == "pass"
+    assert results["counts_on_trigger"]["status"] == "pass"
+
+
+def test_constant_step_column_error_suggests_no_step_column():
+    code, _, err = _run(str(COUNTER), "--trace", str(PEP_STYLE), "--skip-lines", "1")
+
+    assert code == 1
+    assert "strictly increasing" in err
+    assert "if column 'step' is not a step counter, use --no-step-column" in err
+    assert "Warning" not in err  # no gap warning before the error
+
+
+def test_preamble_without_skip_lines_is_an_error():
+    code, _, err = _run(str(COUNTER), "--trace", str(PEP_STYLE), "--no-step-column")
+
+    assert code == 1
+    # The preamble is read as a one-column header; the real header is line 2.
+    assert "pep_style.csv:2: expected 1 fields, found 7" in err
+
+
+def test_no_step_column_keeps_the_column_as_data(tmp_path):
+    trace = _write(tmp_path, "trace.csv", "time\n0\n10\n20\n")
+
+    results = _json(
+        str(FIXTURES / "time_variable.yaml"), "--trace", str(trace), "--no-step-column"
+    )
+
+    # `time` is still checked (20 < 20 fails), but labels are row positions.
+    assert results["early"]["status"] == "fail"
+    assert results["early"]["reported_label"] == 2
+
+
+def test_columns_with_empty_names_are_ignored(tmp_path):
+    trace = _write(tmp_path, "trace.csv", "step,t,,x,,done\n0,0,a,0,b,1\n1,0,,1,,1\n")
+
+    assert _json(str(COUNTER), "--trace", str(trace))["__exit__"] == 0
+
+
+@pytest.mark.parametrize("delimiter", [",", " "])
+def test_skip_lines_keeps_file_line_numbers(tmp_path, delimiter):
+    text = "preamble\nstep,t,x,done\n0,0,abc,0\n".replace(",", delimiter)
+    trace = _write(tmp_path, "trace.csv", text)
+
+    code, _, err = _run(
+        str(COUNTER),
+        "--trace",
+        str(trace),
+        "--skip-lines",
+        "1",
+        "--delimiter",
+        delimiter,
+    )
+
+    assert code == 1
+    assert "trace.csv:3: value in column 'x' is not a number" in err
+
+
+def test_skip_lines_line_numbers_with_multiline_csv_record(tmp_path):
+    # The quoted field spans lines 3-4; csv reports the line where it ends.
+    trace = _write(tmp_path, "trace.csv", 'preamble\nstep,t,x,done\n0,0,"a\nb",0\n')
+
+    code, _, err = _run(str(COUNTER), "--trace", str(trace), "--skip-lines", "1")
+
+    assert code == 1
+    assert "trace.csv:4: value in column 'x' is not a number" in err
+
+
+def test_skip_lines_line_numbers_in_inputs(tmp_path):
+    inputs = _write(tmp_path, "in.csv", "preamble\nt\n1\nabc\n")
+
+    code, _, err = _run(str(COUNTER), "--inputs", str(inputs), "--skip-lines", "1")
+
+    assert code == 1
+    assert "in.csv:4: value in column 't' is not a number" in err
+
+
+@pytest.mark.parametrize("options", [[], ["--no-step-column"]])
+def test_empty_first_column_name_is_ignored(tmp_path, options):
+    trace = _write(tmp_path, "trace.csv", ",t,x,done\nzz,0,0,1\nzz,0,-1,1\n")
+
+    results = _json(str(COUNTER), "--trace", str(trace), *options)
+
+    # Labels are row positions, and x is still read from its own column.
+    assert results["x_nonnegative"]["status"] == "fail"
+    assert results["x_nonnegative"]["reported_row"] == 1
+    assert results["x_nonnegative"]["reported_label"] == 1
+
+
+def test_skip_lines_past_the_end_is_an_empty_file(tmp_path):
+    trace = _write(tmp_path, "trace.csv", "step,t,x,done\n0,0,0,1\n")
+
+    code, _, err = _run(str(COUNTER), "--trace", str(trace), "--skip-lines", "5")
+
+    assert code == 1
+    assert "trace file is empty" in err
+
+
+def test_skip_lines_applies_to_inputs(tmp_path):
+    inputs = _write(tmp_path, "in.csv", "preamble\nt\n1\n0\n1\n1\n0\n")
+
+    assert (
+        _json(str(COUNTER), "--inputs", str(inputs), "--skip-lines", "1")["__exit__"]
+        == 0
+    )
 
 
 # --- input files --------------------------------------------------------------
@@ -362,16 +454,9 @@ def test_input_file_errors(tmp_path, text, message):
 
 
 def test_missing_input_column(tmp_path):
-    model = _write(
-        tmp_path,
-        "model.yaml",
-        "cells:\n  - id: 1\n    contents:\n      - a = 0\n      - b = 0\n"
-        "    input: [a, b]\n"
-        "verification:\n  properties:\n    - id: ok\n      always: a >= 0\n",
-    )
     inputs = _write(tmp_path, "in.csv", "a\n1\n")
 
-    code, _, err = _run(str(model), "--inputs", str(inputs))
+    code, _, err = _run(str(FIXTURES / "two_inputs.yaml"), "--inputs", str(inputs))
 
     assert code == 1
     assert "missing input columns: b" in err
@@ -388,6 +473,8 @@ def test_missing_input_column(tmp_path):
         [str(TICKER), "--steps", "many"],
         [str(TICKER), "--steps", "1", "--delimiter", ";;"],
         [str(TICKER), "--steps", "1", "--delimiter", ""],
+        [str(TICKER), "--steps", "1", "--skip-lines", "-1"],
+        [str(TICKER), "--steps", "1", "--skip-lines", "x"],
     ],
 )
 def test_usage_errors_exit_with_two(args):

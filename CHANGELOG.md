@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1
+
+- `nnc-verify` reads PeP and Webots controller logs: `--no-step-column` labels rows by position when the step column is not a counter, `--skip-lines N` skips a preamble, and columns with an empty name (PeP's separator column) are ignored in `--trace` files. The error for non-increasing step labels suggests `--no-step-column`, and the gap warning no longer appears before that error.
+
 ## 0.9.0
 
 - New user guide `docs/generic_properties.md`: syntax and semantics of every generic property kind, the row-based time model, `strict`/`weak` end of trace, reporting, targets and the MC2 translation, with worked examples.

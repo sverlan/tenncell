@@ -1,0 +1,19 @@
+# MC2 transformer fixture: x is used by the raw entry and by the generic
+# property, y only by the property. Columns list raw entries first, once each.
+cells:
+  - id: 1
+    contents:
+      - x = 0, y = 0
+    output: [x, y]
+
+verification:
+  properties:
+    - id: a
+      when: y > 0
+      then: x > 0
+      after: 1
+  backends:
+    mc2:
+      raw:
+        - id: q
+          code: "P=?[ F([${x}] > 1) ]"

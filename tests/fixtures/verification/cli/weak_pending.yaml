@@ -1,0 +1,16 @@
+# nnc-verify CLI fixture: with trace_semantics weak, an eventually that is not
+# met in a short run is pending, which does not fail the run.
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verification:
+  trace_semantics: weak
+  properties:
+    - id: big
+      eventually: x > 100

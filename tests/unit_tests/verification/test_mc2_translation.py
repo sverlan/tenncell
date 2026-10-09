@@ -32,15 +32,12 @@ CONDITION_KEY = {
 }
 
 
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "verification"
+
+
 @pytest.fixture(scope="module")
-def system(tmp_path_factory) -> NncSystem:
-    path = tmp_path_factory.mktemp("mc2") / "model.yaml"
-    path.write_text(
-        "cells:\n  - id: 1\n    contents:\n      - p = 0, t = 0, x = 0\n"
-        "    output: [p]\nrules:\n  - p -> p\n",
-        encoding="utf-8",
-    )
-    return NncSystem.from_yaml(str(path))
+def system() -> NncSystem:
+    return NncSystem.from_yaml(str(FIXTURES / "pt_model.yaml"))
 
 
 def _translate(system, kind, semantics="strict", **fields):
@@ -194,9 +191,7 @@ def test_condition_rendering(system, condition, expected):
     assert _translate(system, "always", condition=condition) == _q(f"G({expected})")
 
 
-REFERENCES = (
-    Path(__file__).resolve().parents[2] / "fixtures" / "verification" / "references"
-)
+REFERENCES = FIXTURES / "references"
 
 
 @pytest.mark.parametrize(

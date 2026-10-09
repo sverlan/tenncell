@@ -174,9 +174,10 @@ The full verification design is in `docs/verification.md`. `docs/generic_propert
 nnc-verify model.yaml --steps 100              # autonomous model: simulate, then check
 nnc-verify model.yaml --inputs start.csv       # model with inputs: simulate on input rows
 nnc-verify model.yaml --trace run.txt --delimiter " "   # check a recorded trace (e.g. a Webots log)
+nnc-verify model.yaml --trace pep.csv --skip-lines 1 --no-step-column   # a PeP log
 ```
 
-Simulation records every variable, including internal ones. For a recorded trace, a first column named `step`, `_step`, `time`, or `Time` gives the step labels. Each property is reported as `pass`, `fail` (with the row where it failed), `pending` (weak semantics), `covered`/`not_covered`, or `skipped` (not targeted at `native`); `--json` prints the same as JSON. The exit status is `1` if any property fails. See `docs/verification.md` section 6 for the semantics.
+Simulation records every variable, including internal ones. For a recorded trace, a first column named `step`, `_step`, `time`, or `Time` gives the step labels; use `--no-step-column` when that column is not a counter (the Webots ENPS controller writes a constant time step there, and PeP labels the initial state and the first step both 1), and `--skip-lines N` to skip a preamble such as PeP's first line. Columns with an empty name, such as PeP's separator column, are ignored. Each property is reported as `pass`, `fail` (with the row where it failed), `pending` (weak semantics), `covered`/`not_covered`, or `skipped` (not targeted at `native`); `--json` prints the same as JSON. The exit status is `1` if any property fails. See `docs/verification.md` section 6 for the semantics.
 
 ### Verilog backend
 `nnc-gen -t verilog` generates SystemVerilog RTL.

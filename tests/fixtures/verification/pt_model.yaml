@@ -1,0 +1,11 @@
+# Verification unit-test fixture: p is the condition, t the trigger, x a spare
+# column. Used by the native checker and MC2 translation truth-table tests,
+# which build properties and traces in Python; the rules are never run.
+cells:
+  - id: 1
+    contents:
+      - p = 0, t = 0, x = 0
+    output: [p]
+
+rules:
+  - p -> p

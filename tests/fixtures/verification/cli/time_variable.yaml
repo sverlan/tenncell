@@ -1,0 +1,15 @@
+# nnc-verify CLI fixture: a model variable named `time`. In a recorded trace
+# whose first column is `time`, that column gives the labels and is also data.
+cells:
+  - id: 1
+    contents:
+      - time = 0
+    output: [time]
+
+rules:
+  - time + 1 -> time
+
+verification:
+  properties:
+    - id: early
+      always: time < 20

@@ -268,7 +268,10 @@ Each row also has a **label**, used only in reports:
 - simulated rows are labelled `0, 1, 2, ...`;
 - in a recorded trace, a **first** column named `step`, `_step`, `time` or
   `Time` gives the labels; otherwise rows are labelled from `--first-step`
-  (default 0).
+  (default 0);
+- `--no-step-column` labels rows by position even when such a column exists,
+  for logs whose step column is not a counter (PeP and Webots controller logs
+  can write a constant there). The column stays usable as data.
 
 Labels must be finite and strictly increasing. When all labels are whole
 numbers and two consecutive labels differ by more than 1, `nnc-verify` warns,

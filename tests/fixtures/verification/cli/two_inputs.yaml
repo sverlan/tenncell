@@ -1,0 +1,12 @@
+# nnc-verify CLI fixture: a model with two inputs; an input file must name both.
+cells:
+  - id: 1
+    contents:
+      - a = 0
+      - b = 0
+    input: [a, b]
+
+verification:
+  properties:
+    - id: ok
+      always: a >= 0

@@ -1,0 +1,15 @@
+# nnc-verify CLI fixture: x goes negative at row 1, so sqrt(x) raises while
+# evaluating the property (an operational error, not a property failure).
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x - 1 -> x
+
+verification:
+  properties:
+    - id: root
+      always: sqrt(x) >= 0

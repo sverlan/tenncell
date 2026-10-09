@@ -76,6 +76,19 @@ def _parser() -> argparse.ArgumentParser:
         default=0,
         help="Label of the first row of a trace without a step column (default: 0)",
     )
+    parser.add_argument(
+        "--no-step-column",
+        action="store_true",
+        help="Label --trace rows by position even if the first column is named "
+        "step, _step, time or Time; that column is then ordinary data",
+    )
+    parser.add_argument(
+        "--skip-lines",
+        type=_non_negative,
+        default=0,
+        help="Skip N lines (such as a preamble) before the header of --trace and "
+        "--inputs files (default: 0)",
+    )
     parser.add_argument("--json", action="store_true", help="Print results as JSON")
     parser.add_argument(
         "--import-path",
@@ -98,6 +111,19 @@ def _delimiter(text: str) -> str:
     return text
 
 
+def _non_negative(text: str) -> int:
+    """Accept a non-negative integer."""
+    try:
+        value = int(text)
+    except ValueError:
+        value = -1
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            f"must be a non-negative integer, not {text!r}"
+        )
+    return value
+
+
 def _run(args: argparse.Namespace) -> int:
     if args.steps is not None and args.steps < 0:
         raise VerificationError("--steps must be a non-negative integer")
@@ -115,10 +141,15 @@ def _run(args: argparse.Namespace) -> int:
         )
     if args.trace is not None:
         trace = read_trace(
-            args.trace, _required_columns(bound), args.delimiter, args.first_step
+            args.trace,
+            _required_columns(bound),
+            args.delimiter,
+            args.first_step,
+            step_column=not args.no_step_column,
+            skip_lines=args.skip_lines,
         )
     elif args.inputs is not None:
-        trace = simulate_inputs(system, args.inputs, args.delimiter)
+        trace = simulate_inputs(system, args.inputs, args.delimiter, args.skip_lines)
     else:
         trace = simulate_steps(system, args.steps)
     results = check_properties(bound, system, trace)
@@ -139,38 +170,48 @@ def _required_columns(bound: BoundVerification) -> set[str]:
 
 
 def read_trace(
-    path: Path, required: set[str], delimiter: str, first_step: int = 0
+    path: Path,
+    required: set[str],
+    delimiter: str,
+    first_step: int = 0,
+    step_column: bool = True,
+    skip_lines: int = 0,
 ) -> Trace:
     """Read a recorded trace file.
 
     A first column named ``step``, ``_step``, ``time`` or ``Time`` gives the row
-    labels; otherwise rows are labelled ``first_step``, ``first_step + 1``, ...
-    Only the ``required`` columns are read as numbers; other columns are ignored.
+    labels (unless ``step_column`` is false); otherwise rows are labelled
+    ``first_step``, ``first_step + 1``, ... Only the ``required`` columns are read
+    as numbers; other columns, including columns with an empty name (such as
+    PeP's separator column), are ignored.
 
     Args:
         path: Trace file with a header line.
         required: Columns used by the properties being checked.
         delimiter: Field delimiter; ``" "`` means any run of whitespace.
-        first_step: Label of the first row when there is no step column.
+        first_step: Label of the first row when rows are labelled by position.
+        step_column: Whether a step-named first column gives the labels.
+        skip_lines: Number of lines to skip before the header.
 
     Returns:
         The trace (columns absent from the file are left for the checker to report).
 
     Raises:
         VerificationError: For an empty file, duplicate column names, rows with a
-            different number of fields, or non-numeric labels or required values.
+            different number of fields, non-numeric labels or required values, or
+            labels that are not finite and strictly increasing.
     """
-    records = list(_records(path, delimiter))
+    records = list(_records(path, delimiter, skip_lines))
     if not records:
         raise VerificationError(f"{path}: trace file is empty")
     header_line, header = records[0]
-    _check_header(path, header_line, header)
-    duplicates = sorted({name for name in header if header.count(name) > 1})
+    named = [name for name in header if name]
+    duplicates = sorted({name for name in named if named.count(name) > 1})
     if duplicates:
         raise VerificationError(
             f"{path}:{header_line}: duplicate column names: {', '.join(duplicates)}"
         )
-    has_step = header[0] in STEP_COLUMNS
+    has_step = step_column and header[0] in STEP_COLUMNS
     # The label column can also be data, e.g. a model variable named `time`.
     used = {name: index for index, name in enumerate(header) if name in required}
     labels: list[int | float] = []
@@ -192,18 +233,30 @@ def read_trace(
         )
     if not rows:
         raise VerificationError(f"{path}: trace has a header but no data rows")
-    _warn_about_gaps(path, labels)
     try:
-        return Trace(labels, rows)
+        trace = Trace(labels, rows)
     except VerificationError as error:
-        raise VerificationError(f"{path}: {error}") from error
+        hint = (
+            f"; if column '{header[0]}' is not a step counter, use --no-step-column"
+            if has_step and "label" in str(error)
+            else ""
+        )
+        raise VerificationError(f"{path}: {error}{hint}") from error
+    _warn_about_gaps(path, labels)
+    return trace
 
 
-def _records(path: Path, delimiter: str) -> Iterable[tuple[int, list[str]]]:
-    """Yield ``(line number, fields)`` for every non-blank line."""
+def _records(
+    path: Path, delimiter: str, skip_lines: int = 0
+) -> Iterable[tuple[int, list[str]]]:
+    """Yield ``(line number, fields)`` for every non-blank line after the first
+    ``skip_lines`` lines; line numbers count every line of the file."""
     with path.open("r", encoding="utf-8", newline="") as handle:
+        for _ in range(skip_lines):
+            if not handle.readline():
+                return
         if delimiter == " ":
-            for line_number, line in enumerate(handle, start=1):
+            for line_number, line in enumerate(handle, start=skip_lines + 1):
                 if line.strip():
                     yield line_number, line.split()
             return
@@ -212,9 +265,10 @@ def _records(path: Path, delimiter: str) -> Iterable[tuple[int, list[str]]]:
             for fields in reader:
                 if not fields or (len(fields) == 1 and not fields[0].strip()):
                     continue  # a blank or whitespace-only line
-                yield reader.line_num, [field.strip() for field in fields]
+                yield skip_lines + reader.line_num, [field.strip() for field in fields]
         except csv.Error as error:
-            raise VerificationError(f"{path}:{reader.line_num}: {error}") from error
+            line_number = skip_lines + reader.line_num
+            raise VerificationError(f"{path}:{line_number}: {error}") from error
 
 
 def _check_header(path: Path, line: int, header: list[str]) -> None:
@@ -273,7 +327,9 @@ def simulate_steps(system: NncSystem, steps: int) -> Trace:
     return Trace(list(range(len(rows))), rows)
 
 
-def simulate_inputs(system: NncSystem, path: Path, delimiter: str) -> Trace:
+def simulate_inputs(
+    system: NncSystem, path: Path, delimiter: str, skip_lines: int = 0
+) -> Trace:
     """Simulate a model on input records: row 0 is the initial state, and input
     record k drives the transition to row k.
 
@@ -285,7 +341,7 @@ def simulate_inputs(system: NncSystem, path: Path, delimiter: str) -> Trace:
         raise VerificationError(
             "--inputs is for models with inputs; this model has none: use --steps"
         )
-    records = list(_records(path, delimiter))
+    records = list(_records(path, delimiter, skip_lines))
     if not records:
         raise VerificationError(f"{path}: input file is empty")
     header_line, header = records[0]

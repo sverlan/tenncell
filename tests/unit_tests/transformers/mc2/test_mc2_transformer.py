@@ -235,18 +235,8 @@ def test_weak_warning_only_when_an_obligation_can_stay_open(
     )
 
 
-def test_generic_columns_follow_raw_columns_without_duplicates(tmp_path):
-    path = tmp_path / "model.yaml"
-    path.write_text(
-        "cells:\n  - id: 1\n    contents:\n      - x = 0, y = 0\n"
-        "    output: [x, y]\n"
-        "verification:\n  properties:\n"
-        "    - id: a\n      when: y > 0\n      then: x > 0\n      after: 1\n"
-        "  backends:\n    mc2:\n      raw:\n"
-        '        - id: q\n          code: "P=?[ F([${x}] > 1) ]"\n',
-        encoding="utf-8",
-    )
-    transformer, system = _transformer_for(path)
+def test_generic_columns_follow_raw_columns_without_duplicates():
+    transformer, system = _transformer_for(MC2 / "input" / "two_columns.yaml")
 
     assert transformer.transform_files(system)[".mc2.columns"] == "x\ny\n"
 

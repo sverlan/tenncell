@@ -1,0 +1,6 @@
+PeP csv output. Format = STEP_NR VARIABLE_COLUMNS EMPTY_COLUMN ENZYME_COLUMNS
+step, t, x, done, , e1, e2
+32, 0, 0, 0, , 1000, 1000
+32, 1, 1, 0, , 1000, 1000
+32, 0, 1, 1, , 1000, 1000
+32, 0, -1, 1, , 1000, 1000
