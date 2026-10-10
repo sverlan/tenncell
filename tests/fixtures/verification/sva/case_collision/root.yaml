@@ -1,0 +1,22 @@
+# SVA fixture: a/Controller.yaml and b/controller.yaml would be written to
+# Controller.sv and controller.sv, the same file on case-insensitive systems.
+module:
+  name: case_collision_root
+imports:
+  - module: a/Controller.yaml
+    as: ca
+  - module: b/controller.yaml
+    as: cb
+cells:
+  - id: 1
+    contents:
+      - z = 0
+    output: [z]
+rules:
+  - ca.y -> z
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+verification:
+  properties:
+    - id: z_nonnegative
+      always: z >= 0

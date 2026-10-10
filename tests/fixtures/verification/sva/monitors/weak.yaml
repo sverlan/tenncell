@@ -1,0 +1,29 @@
+# SVA monitor fixture: with weak trace semantics for the sva backend, an
+# eventually (bounded or not) still open at the end of the run is reported as
+# pending with an open obligation, not as a failure. (The module needs a name:
+# the file stem `weak` is a SystemVerilog keyword.)
+module:
+  name: weak_semantics
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  backends:
+    sva:
+      trace_semantics: weak
+  properties:
+    - id: open
+      eventually: x > 100
+    - id: window_open
+      eventually: x > 100
+      within: [0, 200]

@@ -11,7 +11,7 @@ module zero_reset_demo #(
 
 // _VAL_5_0 = 5.0 in fixed-point Q16.16
 localparam logic signed [31:0] _VAL_5_0 = 32'sd327680;
-function automatic logic [31:0] conv_sfixed_32_16_to_logic_32(
+function automatic logic signed [31:0] conv_sfixed_32_16_to_logic_32(
     input logic signed [31:0] value
 );
     conv_sfixed_32_16_to_logic_32 = (value >>> 16);
@@ -19,9 +19,9 @@ endfunction
 logic signed [31:0] state_x;
 logic signed [31:0] state_x_next;
 logic signed [31:0] state_x_prod;
-logic [31:0] state_y;
-logic [31:0] state_y_next;
-logic [31:0] state_y_prod;
+logic signed [31:0] state_y;
+logic signed [31:0] state_y_next;
+logic signed [31:0] state_y_prod;
 
 always_comb begin
     state_x_prod = '0;
@@ -50,6 +50,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign y = conv_sfixed_32_16_to_logic_32(state_y);
+assign y = state_y;
 
 endmodule

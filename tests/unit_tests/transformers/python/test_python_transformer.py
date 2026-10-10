@@ -104,6 +104,53 @@ class TestPythonTransformer:
 
         assert generated_output == runtime_output
 
+    def test_numbers_as_connections_step_like_runtime(self):
+        fixtures = FIXTURE_ROOT.parents[1] / "verification" / "sva" / "imported_input"
+        runtime_system = NncSystem.from_yaml(
+            str(fixtures / "numbers.yaml"), import_paths=[str(fixtures)]
+        )
+        namespace = {"__name__": "generated_test"}
+        exec(PythonTransformer().transform(runtime_system), namespace)
+        generated_system = namespace["NncSystem"]()
+
+        runtime_system.step()
+        generated_system.step()
+
+        assert [generated_system._import_c0.y, generated_system._import_c1.y] == [
+            5.0,
+            -2.5,
+        ]
+
+    @pytest.mark.parametrize("model", ["chain.yaml", "loop.yaml"])
+    def test_imports_reading_imports_step_like_runtime(self, model):
+        # Every import reads the configuration before the step: a chained
+        # import lags one step; a loop of imports needs no ordering.
+        fixtures = FIXTURE_ROOT.parents[1] / "verification" / "sva" / "imported_input"
+        runtime_system = NncSystem.from_yaml(
+            str(fixtures / model), import_paths=[str(fixtures)]
+        )
+        namespace = {"__name__": "generated_test"}
+        exec(PythonTransformer().transform(runtime_system), namespace)
+        generated_system = namespace["NncSystem"]()
+        children = {item.alias: item.system for item in runtime_system.imports}
+
+        runtime_rows, generated_rows = [], []
+        for _ in range(4):
+            runtime_system.step()
+            generated_system.step()
+            runtime_rows.append(
+                [children[a].variables["y"].value.value for a in ("c0", "c1")]
+            )
+            generated_rows.append(
+                [getattr(generated_system, f"_import_{a}").y for a in ("c0", "c1")]
+            )
+
+        assert generated_rows == runtime_rows
+        if model == "chain.yaml":
+            assert runtime_rows == [[0.0, 0.0], [1.0, 0.0], [2.0, 1.0], [3.0, 2.0]]
+        else:
+            assert runtime_rows == [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]]
+
     def test_generated_step_matches_runtime_floating_point_semantics(self):
         runtime_system = load_system("numerical_semantics.yaml")
         generated_code = assert_matches_fixture(

@@ -9,7 +9,6 @@ from ..inputs.yaml.sections import YamlSectionContext
 from .config import (
     ACCEPTED_BACKENDS,
     RESERVED_BACKENDS,
-    SVA_MODES,
     TRACE_SEMANTICS,
     ALWAYS,
     COVER,
@@ -32,7 +31,7 @@ _TOP_LEVEL_KEYS = ("environment", "trace_semantics", "properties", "backends")
 _BACKEND_KEYS = {
     "native": ("trace_semantics",),
     "mc2": ("trace_semantics", "raw"),
-    "sva": ("trace_semantics", "mode"),
+    "sva": ("trace_semantics", "raw"),
 }
 _RAW_ENTRY_KEYS = ("id", "description", "code")
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -395,8 +394,15 @@ class _Parser:
         data = self._mapping(
             raw, f"verification.backends.{name} must be a mapping", *path
         )
-        if "raw" in data and name != "mc2":
+        if "raw" in data and name not in ("mc2", "sva"):
             raise self.error(_unsupported_raw_message(name), *path, "raw")
+        if name == "sva" and "mode" in data:
+            raise self.error(
+                "verification.backends.sva.mode is not a model setting: choose "
+                "simulation or formal when generating (nnc-gen -t sva --sva-mode)",
+                *path,
+                "mode",
+            )
         self._reject_unknown_keys(
             data, _BACKEND_KEYS[name], f"verification.backends.{name}", *path
         )
@@ -405,20 +411,9 @@ class _Parser:
             trace_semantics = self._trace_semantics(
                 data["trace_semantics"], *path, "trace_semantics"
             )
-        mode = None
-        if name == "sva":
-            mode = data.get("mode", "simulation")
-            if mode not in SVA_MODES:
-                raise self.error(
-                    f"verification.backends.sva.mode must be one of: "
-                    f"{', '.join(SVA_MODES)}",
-                    *path,
-                    "mode",
-                )
         return BackendSection(
             name=name,
             trace_semantics=trace_semantics,
-            mode=mode,
             raw=self._raw_entries(name, data.get("raw"), *path, "raw"),
         )
 
@@ -472,8 +467,6 @@ class _Parser:
 
 
 def _unsupported_raw_message(backend: str) -> str:
-    if backend == "sva":
-        return "verification.backends.sva.raw is not supported until the SVA backend is implemented"
     return f"verification.backends.{backend} does not accept raw code"
 
 

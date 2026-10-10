@@ -20,6 +20,7 @@ _LIST_MERGE_PATHS: set[tuple[object, ...]] = {
     ("webots", "csv", "variables"),
     ("verification", "properties"),
     ("verification", "backends", "mc2", "raw"),
+    ("verification", "backends", "sva", "raw"),
 }
 
 

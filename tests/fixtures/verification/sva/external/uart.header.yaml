@@ -1,0 +1,12 @@
+# External module header for external/root.yaml.
+schema:
+  name: uart
+  ports:
+    - name: clk
+      direction: input
+      width: 1
+      signed: false
+    - name: ready
+      direction: output
+      width: 1
+      signed: false

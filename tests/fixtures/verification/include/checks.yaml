@@ -8,3 +8,8 @@ verification:
       raw:
         - id: fragment_query
           code: "P>=1[ G([${x}] >= 0) ]"
+    sva:
+      raw:
+        - id: fragment_check
+          code: |
+            always @(posedge clk) assert (${x} < 100);

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from .cell import Cell
-from ..inputs.yaml.module_config import ImportConfig, ModuleConfig
+from ..inputs.yaml.module_config import ImportConfig, ModuleConfig, connection_number
 from ..inputs.yaml.locations import YamlLocationIndex
 from ..parser.ast import (
     BooleanExpression,
@@ -66,6 +66,24 @@ class NncSystem:
         self.source_path: Path | None = None
         self.source_locations: YamlLocationIndex | None = None
         self.metadata: dict[str, str] = {}
+        # Inputs given to each directly imported module in the last step,
+        # keyed by alias (see `last_import_inputs`).
+        self._last_import_inputs: dict[str, dict[str, float]] = {}
+
+    @property
+    def last_import_inputs(self) -> dict[str, dict[str, float]]:
+        """Inputs given to each directly imported module in the last step.
+
+        A child may consume (reset) an input variable during its step; this
+        keeps the value it was given.
+
+        Returns:
+            A copy of the values keyed by import alias, then input name;
+            empty before the first step.
+        """
+        return {
+            alias: dict(values) for alias, values in self._last_import_inputs.items()
+        }
 
     def add_cell(self, cell: Cell):
         """Add a cell and register its variables in the system namespace.
@@ -142,40 +160,6 @@ class NncSystem:
         """
         return evaluate_boolean(node, self)
 
-    def _direct_import_step_order(self) -> list[ImportConfig]:
-        """Return imports in dependency order for a single simulation step."""
-        alias_map = {item.alias: item for item in self.imports}
-        dependency_map: dict[str, set[str]] = {alias: set() for alias in alias_map}
-        for item in self.imports:
-            for connection_ref in item.connections.values():
-                if "." not in connection_ref:
-                    continue
-                head, _, _ = connection_ref.partition(".")
-                if head in alias_map:
-                    dependency_map[item.alias].add(head)
-
-        ordered: list[ImportConfig] = []
-        temp_mark: set[str] = set()
-        perm_mark: set[str] = set()
-
-        def visit(alias: str):
-            if alias in perm_mark:
-                return
-            if alias in temp_mark:
-                raise ValueError(
-                    f"Import connection cycle detected in module '{self.module_config.name}'"
-                )
-            temp_mark.add(alias)
-            for dep in sorted(dependency_map[alias]):
-                visit(dep)
-            temp_mark.remove(alias)
-            perm_mark.add(alias)
-            ordered.append(alias_map[alias])
-
-        for alias in sorted(alias_map):
-            visit(alias)
-        return ordered
-
     def _build_import_inputs(self, item: ImportConfig) -> dict[str, float]:
         """Build the input mapping for a directly imported TENNCell module.
 
@@ -189,14 +173,20 @@ class NncSystem:
             if reference is None:
                 inputs[input_name] = 0.0
                 continue
-            if "." in reference:
+            number = connection_number(reference)
+            if number is not None:
+                inputs[input_name] = number
+            elif "." in reference:
                 inputs[input_name] = self._resolve_runtime_reference(reference).value
             elif reference in self.variables:
                 inputs[input_name] = self.variables[reference].value.value
             elif reference in self.constants:
                 inputs[input_name] = self.constants[reference].value
             else:
-                inputs[input_name] = float(reference)
+                raise ValueError(
+                    f"Import connection '{input_name}' on '{item.alias}' names "
+                    f"unknown '{reference}'"
+                )
         return inputs
 
     def get_variables(self) -> dict[str, FloatValue]:
@@ -207,10 +197,27 @@ class NncSystem:
         }
 
     def step(self, inputs: dict[str, float] | None = None):
-        """Advance the system by one step and return declared outputs.
+        """Advance the system by one synchronous step and return its outputs.
+
+        The step follows numerical P system semantics, like the generated RTL:
+        every directly imported module is first given its inputs from the
+        configuration before the step (parent variables, constants, numbers,
+        and other imports' outputs as they were before the step), and only
+        then do all imports step, followed by this system's rules. An import
+        reading another import's output therefore sees it one step later, and
+        imports may read each other's outputs in a cycle. The values given are
+        kept in ``last_import_inputs``.
 
         Args:
-            inputs: Optional mapping of input variable names to numeric values.
+            inputs: Values of the root input variables, by name; ``None``
+                keeps the current input values.
+
+        Returns:
+            The values of the output variables after the step, by name.
+
+        Raises:
+            ValueError: If ``inputs`` lacks a root input variable, or a
+                connection names an unresolved import or unknown reference.
         """
         if inputs is not None:
             for input_name in self.input_variables.keys():
@@ -220,9 +227,18 @@ class NncSystem:
                     )
                 self.input_variables[input_name].value = FloatValue(inputs[input_name])
 
-        for item in self._direct_import_step_order():
+        # Synchronous step (numerical P system semantics): every import is
+        # given values of the configuration before this step, including other
+        # imports' outputs, before any import steps. An import reading another
+        # import's output sees it one step later, as in the generated RTL.
+        given = {}
+        for item in self.imports:
             assert item.system is not None
-            item.system.step(self._build_import_inputs(item))
+            given[item.alias] = self._build_import_inputs(item)
+        self._last_import_inputs = given
+        for item in self.imports:
+            assert item.system is not None
+            item.system.step(dict(given[item.alias]))
 
         production_values: dict[Rule, FloatValue] = {}
         used_vars: list[Variable] = []
@@ -346,7 +362,16 @@ class NncSystem:
                     raise ValueError(
                         f"Import connection '{port_name}' is not an input on '{item.alias}'"
                     )
-                self._validate_reference(ref)
+                if ref is None or connection_number(ref) is not None:
+                    continue  # not connected (0), or a number
+                if "." in ref:
+                    self._validate_reference(ref)
+                elif ref not in self.variables and ref not in self.constants:
+                    raise ValueError(
+                        f"Import connection '{port_name}' on '{item.alias}' names "
+                        f"unknown '{ref}': expected a variable, a constant, a "
+                        "number or an imported output"
+                    )
 
     @staticmethod
     def from_yaml(

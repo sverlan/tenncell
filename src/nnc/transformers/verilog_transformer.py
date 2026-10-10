@@ -11,6 +11,8 @@ from .verilog.generation.references import VerilogReferenceResolver
 from .verilog.generation.state import VerilogStateEmitter
 from .verilog.generation.structure import VerilogStructuralEmitter
 from .verilog.generation.context import VerilogEmissionContext
+from .verilog.generation.keywords import SYSTEMVERILOG_KEYWORDS
+from .verilog.generation.observation import VerilogObservation, build_observation
 from .verilog.hardware_config import (
     VerilogFixedPointTypeInfo,
     VerilogHardwareConfig,
@@ -162,14 +164,36 @@ class VerilogTransformer(
     def get_file_extension(self) -> str:
         return ".sv"
 
-    def transform(self, system: NncSystem) -> str:
-        self.reset()
-        self._validate_supported_system(system)
+    def observe(self, system: NncSystem) -> VerilogObservation:
+        """Return the TENNCell values observable in the module ``transform`` emits.
 
-        module_name = system.module_config.name
+        The signal names and encodings come from the same emission context and
+        helpers as the generated RTL, so they always match it.
+
+        Args:
+            system: TENNCell system loaded from YAML, with its Verilog config.
+
+        Returns:
+            The module's clock/reset and one ``ObservedSignal`` per root variable,
+            imported output (``alias.port``) and imported input.
+
+        Raises:
+            ValueError: If the system cannot be emitted as Verilog.
+            YamlLocatedError: If a Verilog type hint is invalid.
+        """
+        previous = self._emission_context
+        try:
+            ctx = self._build_emission_context(system)
+            return build_observation(self, ctx)
+        finally:
+            self._emission_context = previous
+
+    def _build_emission_context(self, system: NncSystem) -> VerilogEmissionContext:
+        """Validate a system and build the emission context shared by the RTL
+        emission and ``observe``."""
+        self._validate_supported_system(system)
         config = self._config_for(system)
-        enc = config.real_encoding
-        if enc is None:
+        if config.real_encoding is None:
             raise ValueError("Verilog export requires a verilog.real_encoding section")
         (
             top_ports,
@@ -206,6 +230,56 @@ class VerilogTransformer(
         )
         self._emission_context = ctx
         self._validate_port_bindings(system, ctx)
+        self._validate_identifiers(system, ctx)
+        return ctx
+
+    def _validate_identifiers(
+        self, system: NncSystem, ctx: VerilogEmissionContext
+    ) -> None:
+        """Reject model names the RTL would emit as SystemVerilog keywords."""
+        names: list[tuple[str, str]] = [
+            (system.module_config.name, "the module name (set module.name)")
+        ]
+        for port in self._collect_ports(system):
+            names.append(
+                (port.verilog_name, "a port name (use rename in verilog.ports)")
+            )
+        names += [(name, "a constant name") for name in system.constants]
+        for item in system.imports:
+            # The parent instantiates the child by module name and port names.
+            child = item.system
+            names.append(
+                (
+                    child.module_config.name,
+                    f"the name of imported module '{item.alias}' (set module.name "
+                    f"in {child.source_path})",
+                )
+            )
+            names += [
+                (port.verilog_name, f"a port name of imported module '{item.alias}'")
+                for port in self._collect_ports(child)
+            ]
+            names.append((item.alias, "an import alias"))
+        names += [(item.alias, "an external alias") for item in ctx.config.externals]
+        wires = set(ctx.import_output_bindings) | set(ctx.external_output_bindings)
+        names += [
+            (name, "a variable name (it is a wire of the RTL)")
+            for name in sorted(wires - set(ctx.top_ports))
+        ]
+        for name, role in names:
+            if name in SYSTEMVERILOG_KEYWORDS:
+                raise ValueError(
+                    f"'{name}' is a SystemVerilog keyword and cannot be {role} "
+                    f"in the Verilog generated for '{system.source_path}'"
+                )
+
+    def transform(self, system: NncSystem) -> str:
+        self.reset()
+        ctx = self._build_emission_context(system)
+        module_name = system.module_config.name
+        config = ctx.config
+        enc = config.real_encoding
+        assert enc is not None
         ports = self._collect_ports(system)
         port_lines = [self._port_decl(port) for port in ports]
 
@@ -251,4 +325,52 @@ class VerilogTransformer(
             self.get_output()
             .replace("// __LITERAL_PARAMS__\n\n", literal_text)
             .replace("// __CONVERSION_HELPERS__\n\n", helper_text)
+        )
+
+
+def rtl_file_name(system: NncSystem, suffix: str = "") -> str:
+    """Return the RTL file name of a module: ``<source stem><suffix>.sv``.
+
+    Args:
+        system: Module loaded from YAML.
+        suffix: Optional suffix added to the stem (``nnc-gen --output-suffix``).
+
+    Returns:
+        The file name, as ``nnc-gen -t verilog`` writes it.
+    """
+    assert system.source_path is not None
+    return f"{Path(system.source_path).stem}{suffix}.sv"
+
+
+def check_distinct_rtl_file_names(closure: list[NncSystem], suffix: str = "") -> None:
+    """Reject an import closure in which two modules get the same RTL file name.
+
+    Two modules from different folders with the same source file name (for
+    example ``a/controller.yaml`` and ``b/controller.yaml``) would both be
+    written to ``controller.sv``, and one module would be lost.
+    Names are compared case-insensitively.
+
+    Args:
+        closure: Modules of the import closure.
+        suffix: Optional suffix added to every stem.
+
+    Raises:
+        ValueError: Naming every source file that maps to a duplicate name.
+    """
+    # Compared case-insensitively: Controller.sv and controller.sv are the same
+    # file on Windows and macOS, and generated RTL may move between systems.
+    by_key: dict[str, list[tuple[str, str]]] = {}
+    for item in closure:
+        name = rtl_file_name(item, suffix)
+        by_key.setdefault(name.casefold(), []).append((name, str(item.source_path)))
+    clashes = [entries for entries in by_key.values() if len(entries) > 1]
+    if clashes:
+        details = "; ".join(
+            " and ".join(f"{name} from {path}" for name, path in entries)
+            for entries in clashes
+        )
+        raise ValueError(
+            "two modules of the import closure would be written to the same RTL "
+            f"file, so one module would be lost: {details}; rename one of the "
+            "source files"
         )

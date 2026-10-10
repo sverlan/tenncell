@@ -1,0 +1,42 @@
+# SVA monitor fixture without inputs (nnc-gen -t sva --sva-steps N): x counts
+# the rows (x = row). The shared step counter saturates at row 11 (from_step 5
+# + within 5, plus one); runs of 20 steps keep checking the properties on rows
+# above it.
+module:
+  name: sva_autonomous
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: below_hundred
+      always: x < 100
+    - id: never_fifteen_late
+      never: x == 15
+      from_step: 3
+    - id: twelve_in_window
+      eventually: x == 12
+      within: [0, 5]
+      from_step: 5
+    - id: grows
+      when: x > 2
+      then: x > 3
+      after: 1
+    - id: stays_above
+      when: x == 18
+      then_always: x > 18
+      after: 1
+    - id: reaches_nineteen
+      cover: x == 19
+    - id: reaches_thirty
+      eventually: x == 30

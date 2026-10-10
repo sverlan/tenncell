@@ -1,0 +1,50 @@
+# SVA formal fixture without inputs: x counts the rows (x = row), so every
+# property below holds or fails at a known row. The formal tests check one
+# property at a time (BMC stops at the first failing assertion) and use the
+# rows to lock the depth contract: --sva-depth D explores rows 0..D-1.
+module:
+  name: formal_counter
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: below_hundred          # holds on every row explored
+      always: x < 100
+    - id: never_zero             # fails at row 0
+      never: x == 0
+    - id: never_one              # fails at row 1
+      never: x == 1
+    - id: never_five             # fails at row 5
+      never: x == 5
+    - id: late_window            # x == 1 before the window [2, 3]: fails at row 3
+      eventually: x == 1
+      within: [2, 3]
+    - id: response_late          # satisfied at age 0 only, window [1, 2]: fails at row 3
+      when: x == 1
+      then: x == 1
+      within: [1, 2]
+    - id: response_after_three   # trigger at row 2, checked at row 5: fails at row 5
+      when: x == 2
+      then: x == 100
+      after: 3
+    - id: stays_small            # from row 4 (first trigger 3, after 1): fails at row 6
+      when: x == 3
+      then_always: x < 6
+      after: 1
+    - id: cover_late_one         # x == 1 only before from_step 2: never covered
+      cover: x == 1
+      from_step: 2
+    - id: cover_late_three       # covered at row 3
+      cover: x == 3
+      from_step: 2

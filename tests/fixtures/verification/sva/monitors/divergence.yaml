@@ -1,0 +1,30 @@
+# SVA divergence fixture: the RTL computes in Q8.8 fixed point, native in
+# floating point, so they may legitimately disagree.
+# - Overflow: x doubles every step; at row 7 x = 128 does not fit Q8.8 and the
+#   RTL wraps to -128, so `x_positive` fails in SVA and passes in native.
+# - Rounding: y = 1 then y * 0.1; 0.1 is encoded as 26/256 = 0.1015625, so at
+#   row 1 the RTL has y * 10 = 1.015625 > 1 and `y_tenth_or_one` fails in SVA
+#   only (native: 0.1 * 10 = 1.0). Comparing y with the literal 0.1 would not
+#   diverge: the checker encodes the literal exactly like the RTL constant.
+module:
+  name: sva_divergence
+
+cells:
+  - id: 1
+    contents:
+      - x = 1, y = 1
+    output: [x, y]
+
+rules:
+  - x * 2 -> x
+  - y * 0.1 -> y
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: x_positive
+      always: x > 0
+    - id: y_tenth_or_one
+      always: y * 10 <= 1 || y >= 1

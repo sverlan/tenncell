@@ -1,0 +1,19 @@
+# The child copies its input into y in every step (y * 0 resets y, then a -> y
+# adds the input), consuming the input variable a.
+module:
+  name: imported_input_child
+
+cells:
+  - id: 1
+    contents:
+      - a = 0
+      - y = 0
+    input: [a]
+    output: [y]
+
+rules:
+  - a -> y
+  - y * 0 -> y
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}

@@ -18,7 +18,7 @@ from .lowering import (
     lower_rule_items,
     register_initial_declarations,
 )
-from .module_config import ImportConfig
+from .module_config import ImportConfig, normalize_connection
 from .parsing import parse_constants, parse_module_config
 from .raw_model import RawYamlDocument
 from .resolution import parse_reference_expr, resolve_path
@@ -218,26 +218,43 @@ def _build_system_from_raw_document(
             )
         )
 
-    for import_data in raw_document.imports:
+    for import_index, import_data in enumerate(raw_document.imports):
         alias = import_data["as"]
         import_path = resolve_path(
             import_data["module"], source_path, import_paths_resolved
         )
         try:
+            # Each import is its own instance with its own state: two imports
+            # of the same file must not share one system (they did, so
+            # stepping one also stepped the other).
             imported_system = system_cls.from_yaml(
                 str(import_path),
                 import_paths=[str(path) for path in import_paths_resolved],
                 _loading_stack=loading_stack,
-                _system_cache=system_cache,
+                _system_cache={},
                 _raw_data_cache=raw_data_cache,
             )
         except Exception as e:
             raise as_yaml_located_error(e)
+        connections: dict = {}
+        for port_name, value in (import_data.get("connections") or {}).items():
+            try:
+                connections[port_name] = normalize_connection(value)
+            except ValueError as e:
+                raise as_yaml_located_error(
+                    raw_document.locations.error(
+                        f"Import '{alias}': connection '{port_name}' {e}",
+                        "imports",
+                        import_index,
+                        "connections",
+                        port_name,
+                    )
+                )
         nnc.imports.append(
             ImportConfig(
                 module=str(import_path),
                 alias=alias,
-                connections=import_data.get("connections", {}),
+                connections=connections,
                 system=imported_system,
             )
         )

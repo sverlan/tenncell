@@ -1,0 +1,53 @@
+# SVA checker-interface fixture: renamed root input, imported input/output,
+# aliases, a constant and an FSM-state placeholder.
+module:
+  name: checker_interface
+constants:
+  LIMIT: 3
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      a: req
+aliases:
+  request: req
+  sensed: child0.y
+cells:
+  - id: 1
+    contents:
+      - req = 1
+      - level = 0
+      - mode = 0
+    input: [req]
+    output: [level]
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: IDLE
+    states:
+      - IDLE: []
+      - BUSY: []
+rules:
+  - child0.y -> level
+verilog:
+  clock: sys_clk
+  reset: sys_rst
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    req: {direction: input, kind: fixed, width: 16, signed: true, rename: sva_row}
+    level: {direction: output, kind: fixed, width: 16, signed: true, rename: level_o}
+verification:
+  properties:
+    - id: observes_import
+      always: sensed >= 0
+  backends:
+    sva:
+      raw:
+        - id: interface_names
+          code: |
+            always @(posedge sys_clk) begin
+              assert (${request} == ${child0.a});
+              assert (${sensed} <= ${LIMIT});
+              assert (${level} == ${level});
+              assert (${mode} == ${ctrl.BUSY});
+            end

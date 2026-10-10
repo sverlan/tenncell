@@ -2,12 +2,59 @@
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from ...model.system import NncSystem
+
+
+def normalize_connection(value: object) -> str | None:
+    """Return a YAML connection value as stored in ``connections``.
+
+    Args:
+        value: The YAML value: a reference, a number, or ``None``.
+
+    Returns:
+        The reference text, a number written as its decimal text (``5``,
+        ``2.5``), or ``None`` for a connection left empty (the input gets 0).
+
+    Raises:
+        ValueError: For a boolean, a non-finite number, or another type.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("must be a reference or a number, not a boolean")
+    if isinstance(value, int):
+        try:
+            float(value)
+        except OverflowError:
+            raise ValueError("is a number too large for a connection") from None
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"must be a finite number, not {value}")
+        return repr(value)
+    if isinstance(value, str):
+        return value.strip()
+    raise ValueError(f"must be a reference or a number, not {type(value).__name__}")
+
+
+def connection_number(reference: str) -> float | None:
+    """Return the value of a connection that is a number, else ``None``.
+
+    Numbers are recognized before references, so ``2.5`` is a value and not
+    ``alias.port``.
+    """
+    try:
+        value = float(reference)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if math.isfinite(value) else None
 
 
 @dataclass(slots=True)

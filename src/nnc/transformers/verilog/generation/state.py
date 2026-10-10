@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .references import boundary_wire_name
+
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
 
@@ -18,12 +20,12 @@ class VerilogStateEmitter:
         ctx = ctx or self._emission_context
         assert ctx is not None
         if variable_name in ctx.system.input_variables:
-            return variable_name
+            return self._variable_signal_name(variable_name, ctx)
         enc = ctx.config.real_encoding
         assert enc is not None
         if variable_name in ctx.external_output_bindings:
             external, port = ctx.external_output_bindings[variable_name]
-            source_signal = f"{external.alias}__{port.name}"
+            source_signal = boundary_wire_name(external.alias, port.name)
             return self._external_output_to_target(
                 source_signal,
                 port.kind,

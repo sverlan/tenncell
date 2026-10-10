@@ -95,8 +95,7 @@ verification:
     assert config.trace_semantics == "strict"
     assert config.environment == {}
     assert config.properties == ()
-    assert config.backend("sva").mode == "simulation"
-    assert config.backend("native").mode is None
+    assert config.backend("sva").raw == ()
     assert config.effective_trace_semantics("sva") == "strict"
 
 
@@ -245,12 +244,9 @@ verification:
             r":4: verification\.backends\.native does not accept raw code",
         ),
         (
-            "verification:\n  backends:\n    sva:\n      raw: []\n",
-            r":4: verification\.backends\.sva\.raw is not supported until the SVA backend",
-        ),
-        (
-            "verification:\n  backends:\n    sva:\n      mode: emulation\n",
-            r":4: verification\.backends\.sva\.mode must be one of",
+            "verification:\n  backends:\n    sva:\n      mode: simulation\n",
+            r":4: verification\.backends\.sva\.mode is not a model setting: choose "
+            r"simulation or formal when generating \(nnc-gen -t sva --sva-mode\)",
         ),
         (
             "verification:\n  backends:\n    mc2:\n      runs: 10\n",
@@ -311,8 +307,34 @@ def test_include_fragments_concatenate_verification_lists():
     assert [entry.id for entry in raw] == ["fragment_query", "root_query"]
     fragment_line = system.source_locations.location_for(*raw[0].yaml_path)
     assert fragment_line.source_path.name == "checks.yaml"
+    sva_raw = config.backend("sva").raw
+    assert [entry.id for entry in sva_raw] == ["fragment_check", "root_check"]
 
 
 def test_system_loading_ignores_verification_section():
     system = NncSystem.from_yaml(str(FIXTURES / "input" / "fsm_counter_mc2.yaml"))
     assert "counter" in system.variables
+
+
+def test_sva_raw_entries_are_parsed(tmp_path):
+    config = _parse_text(
+        tmp_path,
+        """
+verification:
+  backends:
+    sva:
+      raw:
+        - id: stays_low
+          description: x never exceeds 3
+          code: |
+            always @(posedge clk) begin
+              assert (${x} <= 3);
+            end
+""",
+    )
+
+    (entry,) = config.backend("sva").raw
+    assert entry.id == "stays_low"
+    assert entry.description == "x never exceeds 3"
+    # Multi-line code is kept (only the one final newline is stripped).
+    assert entry.code == ("always @(posedge clk) begin\n  assert (${x} <= 3);\nend")

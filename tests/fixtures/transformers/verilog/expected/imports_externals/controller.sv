@@ -12,16 +12,10 @@ module controller_top #(
 
 // _VAL_1_0_Q16_8 = 1.0 in fixed-point Q16.8
 localparam logic signed [23:0] _VAL_1_0_Q16_8 = 24'sd256;
-function automatic logic [31:0] conv_logic_8_to_logic_32(
+function automatic logic signed [31:0] conv_logic_8_to_logic_32(
     input logic [7:0] value
 );
     conv_logic_8_to_logic_32 = value;
-endfunction
-
-function automatic logic [31:0] conv_sfixed_32_16_to_logic_32(
-    input logic signed [31:0] value
-);
-    conv_sfixed_32_16_to_logic_32 = (value >>> 16);
 endfunction
 logic signed [23:0] sensor0__level;
 
@@ -30,9 +24,9 @@ logic uart0__rx_valid;
 logic [7:0] uart_rx_data;
 logic uart_rx_valid;
 
-logic [31:0] state_alarm;
-logic [31:0] state_alarm_next;
-logic [31:0] state_alarm_prod;
+logic signed [31:0] state_alarm;
+logic signed [31:0] state_alarm_next;
+logic signed [31:0] state_alarm_prod;
 logic state_alarm_used;
 
 sensor sensor0 (
@@ -77,6 +71,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign alarm = conv_sfixed_32_16_to_logic_32(state_alarm);
+assign alarm = state_alarm;
 
 endmodule

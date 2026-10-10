@@ -1,0 +1,35 @@
+# Numbers as connection values: YAML reads `5` as an integer and `-2.5` as a
+# float; both are constants given to the child in every step (child.yaml
+# copies its input into y). In the RTL they are encoded for the child's port
+# (5 -> 1280, -2.5 -> -640 in Q8.8), not written raw.
+module:
+  name: imported_input_numbers
+
+imports:
+  - module: child.yaml
+    as: c0
+    connections:
+      a: 5
+  - module: child.yaml
+    as: c1
+    connections:
+      a: -2.5
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: integer_copied
+      always: c0.y == 5 || x == 0
+    - id: decimal_copied
+      always: c1.y == -2.5 || x == 0

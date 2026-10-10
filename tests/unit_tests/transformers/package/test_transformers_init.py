@@ -69,8 +69,9 @@ class TestTransformersInit:
         assert "Mc2Transformer" in __all__
         assert "PythonTransformer" in __all__
         assert "VerilogTransformer" in __all__
+        assert "SvaTransformer" in __all__
         assert "WebotsTransformer" in __all__
-        assert len(__all__) == 5
+        assert len(__all__) == 6
 
     def test_missing_export_raises_attribute_error(self):
         """Test that unknown names are rejected by the lazy loader."""

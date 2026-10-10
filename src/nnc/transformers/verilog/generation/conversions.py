@@ -68,15 +68,26 @@ def conversion_descriptor(
     return f"logic_{width}"
 
 
+def storage_declared_signed(kind: str, width: int, signed: bool) -> bool:
+    """Return whether ``type_decl`` declares a storage signal as signed.
+
+    ``signed`` controls the SystemVerilog interpretation of fixed-point and
+    multi-bit logic storage alike; one-bit logic storage stays unsigned, as
+    one-bit ports do.
+    """
+    return signed and (kind != "logic" or width > 1)
+
+
+def port_declared_signed(width: int, signed: bool) -> bool:
+    """Return whether a port or boundary wire is declared signed (never 1-bit)."""
+    return signed and width > 1
+
+
 def type_decl(
     emitter: VerilogConversionEmitter, kind: str, width: int, signed: bool
 ) -> str:
     """Return the Verilog type declaration for a signal kind."""
-    if kind == "logic":
-        if width == 1:
-            return "logic"
-        return f"logic [{width - 1}:0]"
-    sign = " signed" if signed else ""
+    sign = " signed" if storage_declared_signed(kind, width, signed) else ""
     if width == 1:
         return f"logic{sign}"
     return f"logic{sign} [{width - 1}:0]"

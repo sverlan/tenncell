@@ -229,13 +229,6 @@ class TestVerilogHelperCoverage:
             "alarm", "logic", 1, False, 0
         ).startswith("conv_")
         assert (
-            transformer._convert_local_fixed_to_target("alarm", "fixed", 32, True)
-            == "state_alarm"
-        )
-        assert transformer._convert_local_fixed_to_target(
-            "alarm", "logic", 1, False
-        ).startswith("conv_")
-        assert (
             transformer._external_output_to_target(
                 "sig", "logic", 1, False, 0, "logic", 1, False, 0
             )

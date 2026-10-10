@@ -1,0 +1,19 @@
+# nnc-verify CLI fixture: the rule `u -> x` consumes the input u (resets it to
+# 0) in every step, while x accumulates it. Simulated rows still show the input
+# of the step that produced them.
+cells:
+  - id: 1
+    contents:
+      - u = 0, x = 0
+    input: [u]
+    output: [x]
+
+rules:
+  - u -> x
+
+verification:
+  properties:
+    - id: input_three_seen
+      never: u == 3
+    - id: total_below_five
+      always: x < 5

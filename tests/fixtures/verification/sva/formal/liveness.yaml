@@ -1,0 +1,51 @@
+# SVA formal fixture for liveness (unbounded eventually, the live task): x
+# toggles 0, 1, 0, 1, ... on every run, and u is a free input in [0, 5] that
+# the rules ignore. The formal tests check one property at a time:
+# - reaches_one and late_zero hold on every infinite run (late_zero needs
+#   x == 0 from row 5, which happens at row 6);
+# - reaches_two fails: x is never 2;
+# - input_reaches_max fails: the inputs may avoid 5 forever;
+# - never_one fails as a safety property; checked together with reaches_two,
+#   the live task must still fail (it may not assume never_one, which would
+#   leave no run at all);
+# - bounded (true) and covers_one (covered at row 1) check that the safety
+#   and cover tasks run next to the liveness cell, which they ignore.
+module:
+  name: formal_liveness
+
+cells:
+  - id: 1
+    contents:
+      - u = 0, x = 0
+    input: [u]
+    output: [x]
+
+rules:
+  - 1 - x -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    u: {direction: input, kind: fixed, width: 16, signed: true}
+    x: {direction: output, kind: fixed, width: 16, signed: true}
+
+verification:
+  environment:
+    u:
+      range: [0, 5]
+  properties:
+    - id: reaches_one
+      eventually: x == 1
+    - id: late_zero
+      eventually: x == 0
+      from_step: 5
+    - id: reaches_two
+      eventually: x == 2
+    - id: input_reaches_max
+      eventually: u == 5
+    - id: never_one
+      never: x == 1
+    - id: bounded
+      always: x >= 0 && x <= 1
+    - id: covers_one
+      cover: x == 1

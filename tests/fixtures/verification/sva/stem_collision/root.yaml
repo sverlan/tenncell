@@ -1,0 +1,22 @@
+# SVA fixture: two imported modules from different folders share the file name
+# controller.yaml, so their RTL files would both be named controller.sv.
+module:
+  name: stem_collision_root
+imports:
+  - module: drivers/a/controller.yaml
+    as: ca
+  - module: drivers/b/controller.yaml
+    as: cb
+cells:
+  - id: 1
+    contents:
+      - z = 0
+    output: [z]
+rules:
+  - ca.y -> z
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+verification:
+  properties:
+    - id: z_nonnegative
+      always: z >= 0

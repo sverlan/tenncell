@@ -1,4 +1,4 @@
-# Root verification fixture whose MC2 raw entries and properties are split
+# Root verification fixture whose MC2 and SVA raw entries and properties are split
 # across an included fragment and the root file.
 module:
   name: include_main
@@ -22,3 +22,8 @@ verification:
       raw:
         - id: root_query
           code: "P=?[ F([${x}] > 2) ]"
+    sva:
+      raw:
+        - id: root_check
+          code: |
+            always @(posedge clk) assert (${x} >= 0);

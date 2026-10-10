@@ -29,9 +29,17 @@ def encode_float(
     """Encode a floating-point literal using the configured fixed-point format."""
     scaled = int(round(value * (2**frac_bits)))
     if signed:
-        return f"{width}'sd{scaled}"
+        return signed_literal(width, scaled)
     masked = scaled % (1 << width)
     return f"{width}'d{masked}"
+
+
+def signed_literal(width: int, value: int) -> str:
+    """Return a sized signed decimal literal; a negative value is written as
+    ``-W'sdN`` because ``W'sd-N`` is not valid SystemVerilog."""
+    if value < 0:
+        return f"-{width}'sd{-value}"
+    return f"{width}'sd{value}"
 
 
 def literal_param_name(
@@ -79,7 +87,7 @@ def integer_literal_ref(
     """Return a sized integer literal for a packed Verilog target."""
     integer_value = int(round(value))
     if signed:
-        return f"{width}'sd{integer_value}"
+        return signed_literal(width, integer_value)
     masked = integer_value % (1 << width)
     return f"{width}'d{masked}"
 

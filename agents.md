@@ -64,13 +64,13 @@ For each change in logic, behavior, schema, or code generation:
 1. Update `rules.md` to document the change.
 
 
-## Agent instructions
 
-Read and follow `AGENT_PROTOCOL.md`.
+# Agent Instructions
 
-The protocol defines:
-- PRIMARY and REVIEWER roles
-- how Claude and Codex consult each other
-- reviewer invocation rules
-- loop prevention
-- what to do when no role is assigned
+If `AGENTS_INTERACTION.md` exists in the repository root, read and follow it before beginning work.
+
+`AGENTS_INTERACTION.md` contains local agent-to-agent collaboration rules and may not be present in every checkout.
+
+If the file does not exist, continue normally without it.
+
+Unless `AGENTS_INTERACTION.md` says otherwise, follow the repository's normal instructions and the user's explicit requests.

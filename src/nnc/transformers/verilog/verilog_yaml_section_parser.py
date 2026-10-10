@@ -6,6 +6,7 @@ from typing import NoReturn
 from ...inputs.yaml.resolution import resolve_path
 from ...inputs.yaml.errors import YamlLocatedError, as_yaml_located_error
 from ...inputs.yaml.locations import YamlLocationIndex, load_yaml_data_and_locations
+from ...inputs.yaml.module_config import connection_number, normalize_connection
 from ...inputs.yaml.sections import YamlSectionContext
 from .hardware_config import (
     ClockConfig,
@@ -394,13 +395,36 @@ def parse_verilog_section(
                 "externals",
                 alias,
             )
+        outputs = {port.name for port in definition.ports if port.dir == "output"}
+        connections: dict = {}
+        for port_name, value in (external_data.get("connections") or {}).items():
+            try:
+                connections[port_name] = normalize_connection(value)
+                if (
+                    port_name in outputs
+                    and connections[port_name] is not None
+                    and connection_number(connections[port_name]) is not None
+                ):
+                    raise ValueError(
+                        "is an output of the external module: connect it to a "
+                        "variable, not a number"
+                    )
+            except ValueError as e:
+                raise context.locations.error(
+                    f"verilog.externals.{alias}.connections.{port_name} {e}",
+                    "verilog",
+                    "externals",
+                    alias,
+                    "connections",
+                    port_name,
+                ) from e
         config.externals.append(
             ExternalInstance(
                 alias=alias,
                 header=header_value,
                 schema=schema_value,
                 parameters=external_data.get("parameters", {}),
-                connections=external_data.get("connections", {}),
+                connections=connections,
                 definition=definition,
             )
         )

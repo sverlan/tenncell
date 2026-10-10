@@ -1,5 +1,7 @@
 """Internal contract tests for NncSystem runtime helper behavior."""
 
+from pathlib import Path
+
 import pytest
 
 from nnc.inputs.yaml.module_config import ImportConfig, ModuleConfig
@@ -211,7 +213,7 @@ class TestSystemRuntimeHelpers:
         with pytest.raises(ValueError, match="Unsupported boolean node"):
             system._evaluate_boolean(object())
 
-    def test_import_step_order_and_inputs_cover_dependency_branches(self):
+    def test_import_inputs_cover_every_connection_kind(self):
         root = self._make_system()
         root.variables["sample"] = self._make_variable("sample", 2.5)
         root.constants["SCALE"] = FloatValue(4.0)
@@ -224,30 +226,7 @@ class TestSystemRuntimeHelpers:
         child.output_variables["level"] = child.variables["level"]
 
         sensor = ImportConfig(module="sensor.yaml", alias="sensor0", system=child)
-        sensor.connections = {}
         helper = ImportConfig(module="helper.yaml", alias="helper0", system=child)
-        helper.connections = {"raw": "sensor0.level"}
-        root.imports = [sensor, helper]
-
-        assert [item.alias for item in root._direct_import_step_order()] == [
-            "sensor0",
-            "helper0",
-        ]
-
-        root.imports = [
-            sensor,
-            helper,
-            ImportConfig(
-                module="mirror.yaml",
-                alias="mirror0",
-                system=child,
-                connections={"raw": "sensor0.level"},
-            ),
-        ]
-        ordered = root._direct_import_step_order()
-        assert ordered[0].alias == "sensor0"
-        assert ordered[-1].alias in {"helper0", "mirror0"}
-
         sensor.connections = {"raw": "sample", "unset": None}
         helper.connections = {"raw": "sensor0.level", "unset": "SCALE"}
         root.imports = [sensor, helper]
@@ -331,21 +310,59 @@ class TestSystemRuntimeHelpers:
         ]
         root.validate_references()
 
-    def test_direct_import_cycle_is_detected(self):
-        root = self._make_system()
-        a = ImportConfig(
-            module="a.yaml",
-            alias="a",
-            system=self._make_system(),
-            connections={"raw": "b.level"},
-        )
-        b = ImportConfig(
-            module="b.yaml",
-            alias="b",
-            system=self._make_system(),
-            connections={"raw": "a.level"},
-        )
-        root.imports = [a, b]
 
-        with pytest.raises(ValueError, match="Import connection cycle detected"):
-            root._direct_import_step_order()
+IMPORTED_INPUT = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "verification"
+    / "sva"
+    / "imported_input"
+)
+
+
+def test_last_import_inputs_holds_the_given_values_as_a_copy():
+    # The child consumes its input a; the system keeps what it was given.
+    system = NncSystem.from_yaml(
+        str(IMPORTED_INPUT / "parent.yaml"), import_paths=[str(IMPORTED_INPUT)]
+    )
+    assert system.last_import_inputs == {}
+    system.step()
+    system.step()
+
+    given = system.last_import_inputs
+    given["child0"]["a"] = 99.0
+    given.clear()
+
+    assert system.last_import_inputs == {"child0": {"a": 1.0}}
+
+
+def test_imports_read_the_configuration_before_the_step():
+    # c1 reads c0's output: it is given c0.y from before the step (numerical
+    # P system semantics, as in the generated RTL), so c1.y lags c0.y by one.
+    system = NncSystem.from_yaml(
+        str(IMPORTED_INPUT / "chain.yaml"), import_paths=[str(IMPORTED_INPUT)]
+    )
+    rows = []
+    for _ in range(4):
+        system.step()
+        children = {item.alias: item.system for item in system.imports}
+        rows.append(
+            (
+                children["c0"].variables["y"].value.value,
+                children["c1"].variables["y"].value.value,
+            )
+        )
+
+    assert rows == [(0.0, 0.0), (1.0, 0.0), (2.0, 1.0), (3.0, 2.0)]
+
+
+def test_imports_reading_each_other_need_no_ordering():
+    # A cycle between imports is well defined when every import reads the
+    # configuration before the step: each sees the other one step later.
+    system = NncSystem.from_yaml(
+        str(IMPORTED_INPUT / "loop.yaml"), import_paths=[str(IMPORTED_INPUT)]
+    )
+    system.step()
+    system.step()
+
+    assert system.last_import_inputs == {"c0": {"a": 1.0}, "c1": {"a": 1.0}}

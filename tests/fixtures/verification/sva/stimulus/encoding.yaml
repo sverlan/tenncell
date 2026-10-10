@@ -1,0 +1,36 @@
+# SVA stimulus fixture: one root input per port encoding. The stimulus is
+# encoded for each port as the RTL encodes constants:
+#   a: signed 16-bit fixed point, 8 fractional bits, renamed a_in
+#   b: unsigned 4-bit logic
+#   c: one-bit logic
+#   d: unsigned 12-bit fixed point (8 fractional bits)
+# a has an environment range, so values outside it give a warning.
+module:
+  name: stimulus_encoding
+
+cells:
+  - id: 1
+    contents:
+      - a = 0.5, b = 3, c = 0, d = 0, total = 0
+    input: [a, b, c, d]
+    output: [total]
+
+rules:
+  - a -> total
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    a: {direction: input, kind: fixed, width: 16, signed: true, rename: a_in}
+    b: {direction: input, kind: logic, width: 4, signed: false}
+    c: {direction: input, kind: logic, width: 1, signed: false}
+    d: {direction: input, kind: fixed, width: 12, signed: false}
+    total: {direction: output, kind: fixed, width: 16, signed: true}
+
+verification:
+  environment:
+    a:
+      range: [-1, 1]
+  properties:
+    - id: total_bounded
+      always: total < 100

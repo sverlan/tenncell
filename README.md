@@ -10,7 +10,7 @@ them to generated code.
 - Python source export through `nnc-gen -t python`, including import-composed systems as a single generated file
 - Verilog/SystemVerilog export through `nnc-gen -t verilog`
 - Webots Python controller export through `nnc-gen -t webots`
-- property checking with `nnc-verify` (built-in `native` checker, on a simulated run or a recorded trace), and MC2 model-checker query generation through `nnc-gen -t mc2`, from generic properties and raw queries in the `verification` section
+- property checking with `nnc-verify` (built-in `native` checker), MC2 query generation, and RTL simulation/formal checking through the SVA backend, from generic properties and raw backend entries in the `verification` section
 - Optional import/composition metadata for optimized Verilog generation
 
 ## Installation
@@ -82,7 +82,7 @@ The simulator supports standalone TENNCell YAML and import-composed TENNCell sys
 Use `nnc-gen` to generate backend-specific outputs:
 
 ```powershell
-nnc-gen <system_file.yaml> -t {python,verilog,webots,mc2} [options]
+nnc-gen <system_file.yaml> -t {python,verilog,webots,mc2,sva} [options]
 ```
 
 Options:
@@ -120,6 +120,20 @@ Example:
 ```powershell
 nnc-gen examples/webots/e_puck_pid/e_puck_pid.yaml -t webots
 ```
+
+### SVA verification backend
+`nnc-gen -t sva` checks generic `verification.properties` against the RTL that `-t verilog` generates. In simulation mode it writes the RTL closure, a checker module `<stem>_sva.sv`, and a testbench `<stem>_tb.sv` that drives the RTL with your input records (or runs N steps of a model without inputs) and prints one `SVA_RESULT` line per property, with the same statuses and rows as `nnc-verify`:
+
+```powershell
+nnc-gen model.yaml -t sva --sva-inputs inputs.csv -o out   # model with inputs
+nnc-gen model.yaml -t sva --sva-steps 50 -o out            # model without inputs
+cd out; iverilog -g2012 -o sim.vvp (Get-ChildItem *.sv).Name; vvp sim.vvp
+nnc-verify ../model.yaml --inputs model_inputs_decoded.csv  # native, same quantized inputs
+```
+
+With `--sva-source FILE` (external modules of the RTL), also compile the copied files in `out/sva_sources/`. The inputs are encoded for the RTL ports (`<stem>_inputs.hex`); `<stem>_inputs_decoded.csv` holds them decoded back to reals. The RTL computes in fixed point, so results can legitimately differ from `nnc-verify` (overflow, rounding). `--sva-style concurrent` writes standard `assert property` checks instead (strict semantics; for simulators with full SVA support: Verilator 5 runs only the plain `always`, `never` and zero-bound response checks, and Icarus does not compile concurrent assertions). `--sva-mode formal` (or `both`) writes `<stem>.sby` for [SymbiYosys](https://github.com/YosysHQ/sby): bounded checks and covers over the first `--sva-depth` rows (default 20), proofs for runs of any length (k-induction and PDR; only PASS means proved), and a `live` task for unbounded `eventually`. `verification.environment` ranges become input assumptions. Run a task such as `sby -f model.sby bmc` in the output directory (requires Yosys with the slang plugin and a solver); the `live` task additionally requires `suprove`. When `bmc` (or `cover`) finds a trace, `nnc-gen model.yaml -t sva --sva-replay out/model_bmc/engine_0/trace.yw -o replay` generates a self-checking replay: simulate `replay/*.sv` and it prints `SVA_REPLAY reproduced on row N` (or fails if the trace is not reproduced). Then `nnc-verify model.yaml --inputs replay/model_inputs_decoded.csv` tells whether the model agrees or diverges (fixed point).
+
+[`examples/verification/sva_flag.yaml`](examples/verification/sva_flag.yaml) is a passing autonomous example for simulation, bounded formal checks, proofs, cover, and liveness. [`examples/verification/sva_failure.yaml`](examples/verification/sva_failure.yaml) deliberately fails so its BMC witness can be replayed and compared with `nnc-verify`. See [`docs/sva_workflows.md`](docs/sva_workflows.md) for the end-to-end tutorial, `docs/generic_properties.md` section 9.4 for the reference, and `rules.md` section "SVA Backend" for the exact contract.
 
 ### MC2 verification backend
 `nnc-gen -t mc2` generates query files for the [MC2](https://people.brunel.ac.uk/~csstdrg/courses/glasgow_courses/website_sysbiomres/software/mc2/) Monte Carlo model checker (PLTLc).

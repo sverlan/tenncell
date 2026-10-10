@@ -1,0 +1,20 @@
+# Verilog fixture: the parent connects the imported child through the child's
+# renamed ports (.a_in, .y_out); its own wires keep TENNCell names (c0__y).
+module:
+  name: parent
+imports:
+  - module: child.yaml
+    as: c0
+    connections:
+      a: u
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - z = 0
+    input: [u]
+    output: [z]
+rules:
+  - c0.y -> z
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}

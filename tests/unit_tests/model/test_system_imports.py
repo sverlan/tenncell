@@ -485,3 +485,66 @@ class TestSystemImports:
             assert system.constants["ctrl__IDLE"].value == 0.0
             assert system.constants["ctrl__RUN"].value == 1.0
             assert system.step({"start": 0.0}) == {"out": 1.0}
+
+
+IMPORTED_INPUT = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "verification"
+    / "sva"
+    / "imported_input"
+)
+
+
+def test_two_imports_of_the_same_file_are_separate_instances():
+    system = NncSystem.from_yaml(
+        str(IMPORTED_INPUT / "twins.yaml"), import_paths=[str(IMPORTED_INPUT)]
+    )
+    c0, c1 = (item.system for item in system.imports)
+    assert c0 is not c1
+
+    for _ in range(3):
+        system.step()
+
+    # c0 copies x (one step behind), c1 copies the constant 5.
+    assert c0.variables["y"].value.value == 2.0
+    assert c1.variables["y"].value.value == 5.0
+
+
+def test_numbers_as_connections_are_given_to_the_child():
+    system = NncSystem.from_yaml(
+        str(IMPORTED_INPUT / "numbers.yaml"), import_paths=[str(IMPORTED_INPUT)]
+    )
+    assert {item.alias: item.connections for item in system.imports} == {
+        "c0": {"a": "5"},
+        "c1": {"a": "-2.5"},
+    }
+
+    system.step()
+
+    assert system.last_import_inputs == {"c0": {"a": 5.0}, "c1": {"a": -2.5}}
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("true", "connection 'a' must be a reference or a number, not a boolean"),
+        ("[1, 2]", "connection 'a' must be a reference or a number, not list"),
+        (".inf", "connection 'a' must be a finite number"),
+        ("1" + "0" * 400, "connection 'a' is a number too large for a connection"),
+        ("missing", "names unknown 'missing'"),
+    ],
+)
+def test_bad_connection_values_are_rejected(tmp_path, value, message):
+    shutil.copy(IMPORTED_INPUT / "child.yaml", tmp_path / "child.yaml")
+    root = tmp_path / "root.yaml"
+    root.write_text(
+        "imports:\n  - module: child.yaml\n    as: c0\n    connections:\n"
+        f"      a: {value}\n"
+        "cells:\n  - id: 1\n    contents:\n      - x = 0\n    output: [x]\n"
+        "rules:\n  - x -> x\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(Exception, match=message):
+        NncSystem.from_yaml(str(root), import_paths=[str(tmp_path)])

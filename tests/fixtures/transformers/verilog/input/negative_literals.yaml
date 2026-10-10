@@ -1,0 +1,16 @@
+# Verilog fixture: negative constants (reset value -1.5 and comparison with -1)
+# must be emitted as `-W'sdN`, not the invalid `W'sd-N`. After one step, y < -1
+# sets flag to 1 (tests/fixtures/transformers/verilog/sim/negative_literals_tb.sv).
+cells:
+  - id: 1
+    contents:
+      - y = -1.5
+      - flag = 0
+    output: [flag]
+
+rules:
+  - y -> y
+  - y < -1 | 1 -> flag
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}

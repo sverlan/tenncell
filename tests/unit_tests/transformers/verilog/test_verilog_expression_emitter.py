@@ -125,12 +125,19 @@ class TestVerilogExpressionEmitter:
             transformer.visit_DifferenceExpression(DifferenceExpression(x, y))
             == "(state_x - state_y)"
         )
-        assert transformer.visit_MultiplicationExpression(
-            MultiplicationExpression(ConstantExpression(FloatValue(2.0)), x)
-        ).startswith("((")
-        assert transformer.visit_DivisionExpression(
-            DivisionExpression(x, ConstantExpression(FloatValue(2.0)))
-        ).startswith("((")
+        # Q16.16: products and quotients are computed in 64 bits and rescaled.
+        assert (
+            transformer.visit_MultiplicationExpression(
+                MultiplicationExpression(ConstantExpression(FloatValue(2.0)), x)
+            )
+            == "32'((64'(_VAL_2_0) * 64'(state_x)) >>> 16)"
+        )
+        assert (
+            transformer.visit_DivisionExpression(
+                DivisionExpression(x, ConstantExpression(FloatValue(2.0)))
+            )
+            == "32'((64'(state_x) <<< 16) / 64'(_VAL_2_0))"
+        )
         assert (
             transformer.visit_UnaryMinusExpression(UnaryMinusExpression(x))
             == "(-state_x)"

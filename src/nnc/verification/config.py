@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 ACCEPTED_BACKENDS: tuple[str, ...] = ("native", "mc2", "sva")
 RESERVED_BACKENDS: tuple[str, ...] = ("prism", "spin", "english", "custom")
 TRACE_SEMANTICS: tuple[str, ...] = ("strict", "weak")
-SVA_MODES: tuple[str, ...] = ("simulation", "formal", "both")
 
 YamlPath = tuple[object, ...]
 
@@ -103,13 +102,11 @@ class BackendSection:
     Args:
         name: Backend name, one of ``ACCEPTED_BACKENDS``.
         trace_semantics: Optional override of the global trace semantics.
-        mode: SVA generation mode; ``None`` for other backends.
         raw: Raw entries in YAML order.
     """
 
     name: str
     trace_semantics: str | None = None
-    mode: str | None = None
     raw: tuple[RawEntry, ...] = ()
 
 

@@ -12,6 +12,7 @@ from nnc.cli_verify import main
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "verification" / "cli"
 COUNTER = FIXTURES / "counter.yaml"
 TICKER = FIXTURES / "ticker.yaml"
+SVA_FIXTURES = FIXTURES.parent / "sva"
 
 
 def _run(*args: str) -> tuple[int, str, str]:
@@ -57,6 +58,28 @@ def test_inputs_records_drive_rows_one_to_n(tmp_path):
     assert results["counts_on_trigger"]["status"] == "pass"
     assert results["mc2_only"]["status"] == "skipped"
     assert results["__exit__"] == 0
+
+
+def test_input_columns_hold_the_step_input_even_when_consumed(tmp_path):
+    inputs = _write(tmp_path, "in.csv", "u\n1\n3\n0\n")
+
+    results = _json(str(FIXTURES / "consumed_input.yaml"), "--inputs", str(inputs))
+
+    # Row 2 holds u = 3 although the rule u -> x reset u to 0 in that step.
+    assert results["input_three_seen"]["status"] == "fail"
+    assert results["input_three_seen"]["reported_row"] == 2
+    assert results["total_below_five"]["status"] == "pass"
+
+
+def test_imported_input_columns_hold_the_value_given_to_the_child():
+    # The child consumes its input a; the row still holds the value the parent
+    # gave it (x of the previous row), which the child copied into y.
+    model = SVA_FIXTURES / "imported_input" / "parent.yaml"
+
+    results = _json(str(model), "--steps", "3")
+
+    assert results["child_saw_its_input"]["status"] == "pass"
+    assert results["input_lags_parent_state"]["status"] == "pass"
 
 
 def test_inputs_with_too_few_records_leave_eventually_open(tmp_path):

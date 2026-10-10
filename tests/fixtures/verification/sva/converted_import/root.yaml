@@ -1,0 +1,28 @@
+# SVA fixture: the imported child's input `sig` is driven through a conversion
+# (1-bit led -> 32-bit logic), so in the RTL `child0.sig` is an expression, not
+# a signal: an SVA raw placeholder naming it is an error.
+module:
+  name: converted_import_root
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding: {kind: fixed_point, signed: false, width: 40, frac_bits: 10}
+  ports:
+    led: {direction: input, width: 1, signed: false}
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      sig: led
+cells:
+  - id: 1
+    contents:
+      - led = 0
+    input: [led]
+verification:
+  backends:
+    sva:
+      raw:
+        - id: child_input
+          code: |
+            always @(posedge clk) assert (${child0.sig} >= 0);

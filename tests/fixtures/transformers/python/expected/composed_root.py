@@ -69,7 +69,9 @@ class _Module_controller(_NncModuleBase):
         # Update input variables
         self.sample = float(inputs['sample'])
 
-        self._import_sensor0.step({'raw': float(self.sample)})
+        # Every import reads the configuration before this step.
+        _inputs_sensor0 = {'raw': float(self.sample)}
+        self._import_sensor0.step(_inputs_sensor0)
 
         # TENNCell step using _new variables approach
 

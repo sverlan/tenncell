@@ -1,0 +1,35 @@
+# c1 reads c0's output. Every import reads the configuration before the step
+# (numerical P system semantics), so c1 is given c0's output from the previous
+# row and c1.y lags c0.y by one row, in the model (nnc-sim, nnc-verify, the
+# Python backend) and in the generated RTL alike.
+module:
+  name: imported_input_chain
+
+imports:
+  - module: child.yaml
+    as: c0
+    connections:
+      a: x
+  - module: child.yaml
+    as: c1
+    connections:
+      a: c0.y
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: same_step       # fails at row 2: c1 does not see c0's new output
+      always: c1.y == c0.y
+    - id: one_row_later   # holds
+      always: c1.y + 1 == c0.y || c0.y == 0

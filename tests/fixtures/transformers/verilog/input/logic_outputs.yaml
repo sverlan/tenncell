@@ -1,0 +1,20 @@
+# Verilog fixture: outputs on logic ports keep their values. x counts 0, 1, 2, 3
+# on an unsigned 8-bit port; m holds -1 on a signed 8-bit port. Both registers
+# already use the port encoding, so the outputs are plain assignments
+# (tests/fixtures/transformers/verilog/sim/logic_outputs_tb.sv).
+cells:
+  - id: 1
+    contents:
+      - x = 0
+      - m = -1
+    output: [x, m]
+
+rules:
+  - x + 1 -> x
+  - m -> m
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    x: {direction: output, kind: logic, width: 8, signed: false}
+    m: {direction: output, kind: logic, width: 8, signed: true}

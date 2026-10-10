@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from yaml.nodes import MappingNode, Node, SequenceNode
 
 from .lexical import sanitize_bang_prefixed_scalars
 from .yaml_schema import TenncellYamlLoader
+
+if TYPE_CHECKING:  # errors imports this module
+    from .errors import YamlLocatedError
 
 
 @dataclass(slots=True)

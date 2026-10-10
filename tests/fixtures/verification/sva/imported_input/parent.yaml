@@ -1,0 +1,32 @@
+# The child consumes the pre-edge value of parent register x. On row k,
+# child0.a (the value the child was given) and child0.y (which copies it) hold
+# x from row k-1, while x has already advanced. nnc-verify records the given
+# value, and the SVA checker reads it through a row-aligned copy of child0.a,
+# not the live x.
+module:
+  name: imported_input_parent
+
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      a: x
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: child_saw_its_input
+      always: child0.a == child0.y
+    - id: input_lags_parent_state
+      always: child0.a + 1 == x || x == 0

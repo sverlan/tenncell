@@ -101,14 +101,19 @@ class VerilogExpressionEmitter:
     def _variable_signal_name(
         self, variable_name: str, ctx: VerilogEmissionContext
     ) -> str:
-        """Return the signal name used for a TENNCell variable reference."""
+        """Return the signal name used for a TENNCell variable reference.
+
+        A root input, and an output driven by an imported or external output,
+        is read from its port, under the port's ``rename`` if set.
+        """
+        port = ctx.top_ports.get(variable_name)
         if variable_name in ctx.system.input_variables:
-            return variable_name
+            return port.verilog_name if port is not None else variable_name
         if (
             variable_name in ctx.external_output_bindings
             or variable_name in ctx.import_output_bindings
         ):
-            return variable_name
+            return port.verilog_name if port is not None else variable_name
         return self._state_name(variable_name)
 
     def _encoding_for_expression(
@@ -225,9 +230,9 @@ class VerilogExpressionEmitter:
         if isinstance(node, DifferenceExpression):
             return f"({self._emit_in_encoding(node.left, target_encoding, ctx)} - {self._emit_in_encoding(node.right, target_encoding, ctx)})"
         if isinstance(node, MultiplicationExpression):
-            return f"({self._emit_in_encoding(node.left, target_encoding, ctx)} * {self._emit_in_encoding(node.right, target_encoding, ctx)})"
+            return self._emit_product(node, target_encoding, ctx)
         if isinstance(node, DivisionExpression):
-            return f"({self._emit_in_encoding(node.left, target_encoding, ctx)} / {self._emit_in_encoding(node.right, target_encoding, ctx)})"
+            return self._emit_quotient(node, target_encoding, ctx)
         if isinstance(node, IntMultiplicationExpression):
             expr_target = self._encoding_for_expression(node.expression, ctx)
             return f"({self._emit_constant_in_encoding(float(node.constant), expr_target, ctx)} * {self._emit_in_encoding(node.expression, expr_target, ctx)})"
@@ -275,13 +280,7 @@ class VerilogExpressionEmitter:
         """Emit the Verilog expression for one TENNCell variable reference."""
         ctx = ctx or self._emission_context
         assert ctx is not None
-        if node.variable.name in ctx.system.input_variables:
-            return node.variable.name
-        if node.variable.name in ctx.external_output_bindings:
-            return node.variable.name
-        if node.variable.name in ctx.import_output_bindings:
-            return node.variable.name
-        return self._state_name(node.variable.name)
+        return self._variable_signal_name(node.variable.name, ctx)
 
     def visit_ReferenceExpression(
         self, node: ReferenceExpression, ctx: VerilogEmissionContext | None = None
@@ -336,11 +335,7 @@ class VerilogExpressionEmitter:
             )
         ctx = ctx or self._emission_context
         assert ctx is not None
-        target = self._module_encoding(ctx)
-        return (
-            f"(({self._emit_in_encoding(node.left, target, ctx)} * "
-            f"{self._emit_in_encoding(node.right, target, ctx)}) >>> FRAC_BITS)"
-        )
+        return self._emit_product(node, self._module_encoding(ctx), ctx)
 
     def visit_DivisionExpression(
         self, node: DivisionExpression, ctx: VerilogEmissionContext | None = None
@@ -350,10 +345,51 @@ class VerilogExpressionEmitter:
             raise ValueError("Verilog export does not support general division")
         ctx = ctx or self._emission_context
         assert ctx is not None
-        target = self._module_encoding(ctx)
+        return self._emit_quotient(node, self._module_encoding(ctx), ctx)
+
+    def _emit_product(
+        self,
+        node: MultiplicationExpression,
+        target_encoding: VerilogEncoding,
+        ctx: VerilogEmissionContext,
+    ) -> str:
+        """Emit a product of two values in ``target_encoding``.
+
+        A fixed-point product carries twice the fractional bits, so it is
+        computed in double width and shifted back, then cast to the target
+        width; computing it in the target width would drop its high bits.
+        """
+        left = self._emit_in_encoding(node.left, target_encoding, ctx)
+        right = self._emit_in_encoding(node.right, target_encoding, ctx)
+        if target_encoding.kind != "fixed" or target_encoding.frac_bits == 0:
+            return f"({left} * {right})"
+        width = target_encoding.width
+        wide = 2 * width
         return (
-            f"(({self._emit_in_encoding(node.left, target, ctx)} <<< FRAC_BITS) / "
-            f"{self._emit_in_encoding(node.right, target, ctx)})"
+            f"{width}'(({wide}'({left}) * {wide}'({right})) "
+            f">>> {target_encoding.frac_bits})"
+        )
+
+    def _emit_quotient(
+        self,
+        node: DivisionExpression,
+        target_encoding: VerilogEncoding,
+        ctx: VerilogEmissionContext,
+    ) -> str:
+        """Emit a quotient of two values in ``target_encoding``.
+
+        A fixed-point dividend is shifted left by the fractional bits in
+        double width before the division, so the quotient keeps them.
+        """
+        left = self._emit_in_encoding(node.left, target_encoding, ctx)
+        right = self._emit_in_encoding(node.right, target_encoding, ctx)
+        if target_encoding.kind != "fixed" or target_encoding.frac_bits == 0:
+            return f"({left} / {right})"
+        width = target_encoding.width
+        wide = 2 * width
+        return (
+            f"{width}'(({wide}'({left}) <<< {target_encoding.frac_bits}) "
+            f"/ {wide}'({right}))"
         )
 
     def visit_UnaryMinusExpression(

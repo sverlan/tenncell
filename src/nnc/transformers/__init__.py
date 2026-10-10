@@ -6,6 +6,7 @@ __all__ = [
     "BaseTransformer",
     "Mc2Transformer",
     "PythonTransformer",
+    "SvaTransformer",
     "VerilogTransformer",
     "WebotsTransformer",
 ]
@@ -18,6 +19,8 @@ def __getattr__(name: str):
         return import_module(".mc2_transformer", __name__).Mc2Transformer
     if name == "PythonTransformer":
         return import_module(".python_transformer", __name__).PythonTransformer
+    if name == "SvaTransformer":
+        return import_module(".sva_transformer", __name__).SvaTransformer
     if name == "VerilogTransformer":
         return import_module(".verilog_transformer", __name__).VerilogTransformer
     if name == "WebotsTransformer":

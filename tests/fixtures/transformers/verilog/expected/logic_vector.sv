@@ -9,11 +9,6 @@ module logic_vector_demo #(
     output logic [5:0] leds
 );
 
-function automatic logic [5:0] conv_ufixed_40_10_to_logic_6(
-    input logic [39:0] value
-);
-    conv_ufixed_40_10_to_logic_6 = (value >>> 10);
-endfunction
 logic [5:0] state_leds;
 logic [5:0] state_leds_next;
 logic [5:0] state_leds_prod;
@@ -40,6 +35,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign leds = conv_ufixed_40_10_to_logic_6(state_leds);
+assign leds = state_leds;
 
 endmodule

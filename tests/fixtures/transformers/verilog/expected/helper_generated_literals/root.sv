@@ -11,7 +11,7 @@ module root #(
 
 // _VAL_0_0 = 0.0 in fixed-point Q30.10
 localparam logic [39:0] _VAL_0_0 = 40'd0;
-function automatic logic [31:0] conv_logic_to_logic_32(
+function automatic logic signed [31:0] conv_logic_to_logic_32(
     input logic value
 );
     conv_logic_to_logic_32 = value;

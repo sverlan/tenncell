@@ -47,9 +47,9 @@ write_template = "__version__ = '{}'"
 [tool.pdm.scripts]
 test = "pytest --cov=nnc --cov-report=xml --cov-report=term-missing"
 builddoc = "sphinx-build -b html docs/source build/docs"
-lint = "ruff check --select F401,F841 src/nnc"
+lint = "ruff check --select F401,F821,F841 src/nnc"
 format = "ruff format src tests/unit_tests tests/functional_tests tests/cli_tests"
-typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/verification src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py src/nnc/cli_verify.py"
+typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/verification src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py src/nnc/cli_verify.py src/nnc/transformers/sva_transformer.py src/nnc/transformers/sva_conditions.py"
 
 
 [tool.coverage.run]

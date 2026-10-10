@@ -309,6 +309,31 @@ class TestMain:
             assert (out_dir / "controller.py").exists()
             assert not (out_dir / "sensor.py").exists()
 
+    def test_main_verilog_rejects_modules_with_the_same_file_name(self):
+        # drivers/a/controller.yaml and drivers/b/controller.yaml would both be
+        # written to controller.sv; nothing is written, and the error names both.
+        model = (
+            Path(__file__).resolve().parents[1]
+            / "fixtures"
+            / "verification"
+            / "sva"
+            / "stem_collision"
+            / "root.yaml"
+        )
+        with TemporaryDirectory() as tmp_dir:
+            out_dir = Path(tmp_dir) / "out"
+            with patch(
+                "sys.argv", ["nnc-gen", str(model), "-t", "verilog", "-o", str(out_dir)]
+            ):
+                with patch("sys.stderr", new_callable=StringIO) as stderr:
+                    assert main() == 1
+
+            assert not any(out_dir.glob("*.sv"))
+        errors = stderr.getvalue()
+        assert "would be written to the same RTL file" in errors
+        assert str(Path("drivers") / "a" / "controller.yaml") in errors
+        assert str(Path("drivers") / "b" / "controller.yaml") in errors
+
     def test_main_verilog_import_paths_string_uses_search_paths(self):
         with TemporaryDirectory() as tmp_dir:
             tmp_dir = Path(tmp_dir)

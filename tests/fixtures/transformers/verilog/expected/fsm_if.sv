@@ -19,18 +19,13 @@ localparam logic signed [31:0] ctrl__RUN = 32'sd65536;
 localparam logic signed [31:0] _VAL_0_0 = 32'sd0;
 // _VAL_1_0 = 1.0 in fixed-point Q16.16
 localparam logic signed [31:0] _VAL_1_0 = 32'sd65536;
-function automatic logic [31:0] conv_sfixed_32_16_to_logic_32(
-    input logic signed [31:0] value
-);
-    conv_sfixed_32_16_to_logic_32 = (value >>> 16);
-endfunction
 logic signed [31:0] state_ctrl_state;
 logic signed [31:0] state_ctrl_state_next;
 logic signed [31:0] state_ctrl_state_prod;
 logic state_ctrl_state_used;
-logic [31:0] state_y;
-logic [31:0] state_y_next;
-logic [31:0] state_y_prod;
+logic signed [31:0] state_y;
+logic signed [31:0] state_y_next;
+logic signed [31:0] state_y_prod;
 logic state_y_used;
 
 always_comb begin
@@ -41,7 +36,7 @@ always_comb begin
 
     // ((ctrl_state == 0) && (x > 2)) : ((ctrl_state * 0) + 1) -> ctrl_state
     if (((state_ctrl_state == _VAL_0_0) && (x > 32'sd2))) begin
-        state_ctrl_state_prod = state_ctrl_state_prod + ((state_ctrl_state * _VAL_0_0) + _VAL_1_0);
+        state_ctrl_state_prod = state_ctrl_state_prod + (32'((64'(state_ctrl_state) * 64'(_VAL_0_0)) >>> 16) + _VAL_1_0);
         state_ctrl_state_used = 1'b1;
     end
     // ((ctrl_state == 0) && (x > 2)) : 1 -> y
@@ -85,6 +80,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign y = conv_sfixed_32_16_to_logic_32(state_y);
+assign y = state_y;
 
 endmodule

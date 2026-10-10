@@ -1,0 +1,27 @@
+# SVA fixture: a generic property reads the imported child's input `sig`, which
+# the RTL drives through a conversion (an expression, not a signal), so the SVA
+# backend skips it; `led_low` reads a plain signal and is kept.
+module:
+  name: converted_import_property
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding: {kind: fixed_point, signed: false, width: 40, frac_bits: 10}
+  ports:
+    led: {direction: input, width: 1, signed: false}
+imports:
+  - module: child.yaml
+    as: child0
+    connections:
+      sig: led
+cells:
+  - id: 1
+    contents:
+      - led = 0
+    input: [led]
+verification:
+  properties:
+    - id: child_input_small
+      always: child0.sig < 2
+    - id: led_low
+      always: led <= 1

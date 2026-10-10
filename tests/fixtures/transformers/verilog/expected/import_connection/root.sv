@@ -9,9 +9,9 @@ module root #(
 );
 
 
-logic [31:0] state_toggle_pulse;
-logic [31:0] state_toggle_pulse_next;
-logic [31:0] state_toggle_pulse_prod;
+logic signed [31:0] state_toggle_pulse;
+logic signed [31:0] state_toggle_pulse_next;
+logic signed [31:0] state_toggle_pulse_prod;
 logic state_toggle_pulse_used;
 
 child child0 (

@@ -1,0 +1,37 @@
+# Deliberately failing SVA example. The formal environment permits u = 2,
+# while x_is_at_most_one asserts that the copied value never exceeds 1. BMC
+# therefore produces a witness that --sva-replay can reproduce in RTL
+# simulation. See docs/sva_workflows.md for the complete
+# commands, expected output and native comparison.
+module:
+  name: sva_failure
+  description: Deliberate safety failure for BMC counterexample replay
+  zero_reset_mode: true
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - x = 0
+    input: [u]
+    output: [x]
+
+rules:
+  - u -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    u: {direction: input, kind: fixed, signed: true, width: 16}
+    x: {direction: output, kind: fixed, signed: true, width: 16}
+
+verification:
+  environment:
+    u: {range: [0, 2]}
+  properties:
+    - id: x_is_at_most_one
+      description: Deliberately false because the environment permits u = 2
+      always: x <= 1
+    - id: reaches_two
+      description: The allowed value 2 is reachable
+      cover: x == 2

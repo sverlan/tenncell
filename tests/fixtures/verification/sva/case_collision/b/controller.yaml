@@ -1,0 +1,13 @@
+# SVA fixture: imported module b/controller.yaml; its RTL file name differs from the
+# other one only by letter case.
+module:
+  name: case_controller_b
+cells:
+  - id: 1
+    contents:
+      - y = 0
+    output: [y]
+rules:
+  - y + 1 -> y
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}

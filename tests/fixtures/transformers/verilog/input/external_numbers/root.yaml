@@ -1,0 +1,30 @@
+# Verilog fixture: numbers driving external module inputs are encoded for each
+# port (fixed point 2.5 -> _VAL_2_5, one bit 1 -> 1'b1, 8-bit logic 3 -> 8'd3);
+# an empty connection and 0 drive 0. The output ready drives the variable rdy.
+module:
+  name: external_numbers
+
+cells:
+  - id: 1
+    contents:
+      - x = 0, rdy = 0
+    output: [x]
+
+rules:
+  - rdy -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    x: {direction: output, kind: fixed, width: 16, signed: true}
+  externals:
+    dev0:
+      header: dev.header.yaml
+      connections:
+        clk: clk
+        level: 2.5
+        en: 1
+        mode: 3
+        spare: null
+        zero: 0
+        ready: rdy

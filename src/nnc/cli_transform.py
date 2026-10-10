@@ -13,14 +13,25 @@ from nnc.transformers import (
     BaseTransformer,
     Mc2Transformer,
     PythonTransformer,
+    SvaTransformer,
     VerilogTransformer,
     WebotsTransformer,
 )
 from nnc.transformers.webots.webots_config import WebotsCsvConfig
 from nnc.transformers.webots.webots_yaml_section_parser import parse_webots_section
 from nnc.transformers.verilog.verilog_yaml_section_parser import parse_verilog_section
+from nnc.transformers.verilog_transformer import check_distinct_rtl_file_names
 from nnc.verification.binding import BoundVerification, bind_verification
 from nnc.verification.section_parser import parse_verification_section
+from nnc.verification.sva import (
+    SVA_MODES,
+    SVA_STYLES,
+    SIMULATION,
+    MONITOR,
+    SvaOptions,
+    SvaOptionsError,
+)
+from nnc.verification.sva_stimulus import SvaStimulusSource
 from nnc._version import __version__
 
 
@@ -31,6 +42,9 @@ TRANSFORMERS: Dict[str, Type[BaseTransformer]] = {
     "webots": WebotsTransformer,
     "mc2": Mc2Transformer,
 }
+# `-t sva` writes several files per model (RTL closure, checker, testbench);
+# it is handled by SvaTransformer, outside the BaseTransformer registry.
+SVA_TARGET = "sva"
 
 
 def get_transformer(transform_type: str) -> BaseTransformer:
@@ -75,7 +89,7 @@ def main():
         "--type",
         dest="transform_type",
         required=True,
-        choices=list(TRANSFORMERS.keys()),
+        choices=[*TRANSFORMERS.keys(), SVA_TARGET],
         help="Transformation type",
     )
 
@@ -107,15 +121,21 @@ def main():
         default="",
         help="Path-separated list of additional import directories",
     )
+    _add_sva_arguments(parser)
 
     args = parser.parse_args()
+    sva_options = _check_sva_arguments(parser, args)
 
     # Ensure output directory exists
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Get transformer
     try:
-        transformer = get_transformer(args.transform_type)
+        transformer = (
+            None
+            if args.transform_type == SVA_TARGET
+            else get_transformer(args.transform_type)
+        )
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -148,10 +168,26 @@ def main():
                 _raw_data_cache=raw_data_cache,
             )
 
+            if args.transform_type == SVA_TARGET:
+                assert sva_options is not None
+                _generate_sva(
+                    nnc_system,
+                    nnc_file,
+                    raw_data_cache,
+                    extra_import_paths,
+                    sva_options,
+                    _sva_stimulus_source(args),
+                    args.output_dir,
+                    args.verbose,
+                )
+                continue
+            assert transformer is not None
+
             # Verilog emits one file per module in the import closure.
             # Python and Webots emit one composed file for the root system only.
             if args.transform_type == "verilog":
                 systems_to_emit = _collect_import_closure(nnc_system)
+                check_distinct_rtl_file_names(systems_to_emit, args.output_suffix or "")
                 assert isinstance(transformer, VerilogTransformer)
                 transformer.set_verilog_configs(
                     _parse_verilog_configs(
@@ -209,6 +245,159 @@ def main():
     if had_error:
         return 1
     return 0
+
+
+def _add_sva_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register the ``-t sva`` options; restricted ones default to ``None``."""
+    from nnc.cli_verify import _delimiter, _non_negative
+
+    group = parser.add_argument_group("SVA options (-t sva)")
+    group.add_argument(
+        "--sva-mode",
+        choices=SVA_MODES,
+        help="simulation (default; testbench), formal (SymbiYosys bmc and cover) or both",
+    )
+    group.add_argument(
+        "--sva-style",
+        choices=SVA_STYLES,
+        help="monitor (default) or concurrent (assert property, for simulators "
+        "with full SVA support; strict semantics only)",
+    )
+    group.add_argument(
+        "--sva-inputs",
+        type=Path,
+        help="Input file of a model with inputs, as for nnc-verify --inputs",
+    )
+    group.add_argument(
+        "--sva-steps",
+        type=_non_negative,
+        help="Number of steps of a model without inputs (N steps, N+1 rows)",
+    )
+    group.add_argument(
+        "--sva-replay",
+        type=Path,
+        help="Replay a SymbiYosys witness (.yw of a bmc or cover trace) in simulation",
+    )
+    group.add_argument(
+        "--sva-depth",
+        type=int,
+        help="Rows explored by formal checks, from row 0 (default: 20)",
+    )
+    group.add_argument(
+        "--sva-source",
+        type=Path,
+        action="append",
+        default=[],
+        help="External RTL source, copied to sva_sources/ (repeatable)",
+    )
+    group.add_argument(
+        "--sva-max-bound",
+        type=int,
+        help="Largest after/within/from_step bound accepted (default: 1024)",
+    )
+    group.add_argument(
+        "--delimiter",
+        type=_delimiter,
+        help='Field delimiter of --sva-inputs; " " means any whitespace (default: comma)',
+    )
+    group.add_argument(
+        "--skip-lines",
+        type=_non_negative,
+        help="Lines to skip before the header of --sva-inputs (default: 0)",
+    )
+
+
+def _check_sva_arguments(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> SvaOptions | None:
+    """Check the ``-t sva`` options (usage errors exit with 2) and return the
+    generation options, or ``None`` for another target."""
+    given = [
+        option
+        for option, value in (
+            ("--sva-mode", args.sva_mode),
+            ("--sva-style", args.sva_style),
+            ("--sva-inputs", args.sva_inputs),
+            ("--sva-steps", args.sva_steps),
+            ("--sva-replay", args.sva_replay),
+            ("--sva-depth", args.sva_depth),
+            ("--sva-source", args.sva_source or None),
+            ("--sva-max-bound", args.sva_max_bound),
+            ("--delimiter", args.delimiter),
+            ("--skip-lines", args.skip_lines),
+        )
+        if value is not None
+    ]
+    if args.transform_type != SVA_TARGET:
+        if given:
+            parser.error(f"{', '.join(given)}: only with -t sva")
+        return None
+    if args.output_suffix:
+        parser.error("--output-suffix is not supported with -t sva")
+    mode = args.sva_mode or SIMULATION
+    sources = [
+        option
+        for option, value in (
+            ("--sva-inputs", args.sva_inputs),
+            ("--sva-steps", args.sva_steps),
+            ("--sva-replay", args.sva_replay),
+        )
+        if value is not None
+    ]
+    if len(sources) > 1:
+        parser.error(f"give only one of {', '.join(sources)}")
+    if args.sva_inputs is None and (
+        args.delimiter is not None or args.skip_lines is not None
+    ):
+        parser.error("--delimiter and --skip-lines apply to --sva-inputs")
+    try:
+        return SvaOptions(
+            mode=mode,
+            style=args.sva_style or MONITOR,
+            depth=args.sva_depth,
+            sources=tuple(args.sva_source),
+            max_bound=args.sva_max_bound,
+        )
+    except SvaOptionsError as error:
+        parser.error(str(error))
+
+
+def _sva_stimulus_source(args: argparse.Namespace) -> SvaStimulusSource:
+    return SvaStimulusSource(
+        inputs=args.sva_inputs,
+        steps=args.sva_steps,
+        witness=args.sva_replay,
+        delimiter=args.delimiter if args.delimiter is not None else ",",
+        skip_lines=args.skip_lines or 0,
+    )
+
+
+def _generate_sva(
+    system: NncSystem,
+    source_file: Path,
+    raw_data_cache: dict,
+    import_paths: list[str],
+    options: SvaOptions,
+    stimulus: SvaStimulusSource,
+    out_dir: Path,
+    verbose: bool,
+) -> None:
+    """Generate and write the ``-t sva`` files of one root model."""
+    transformer = SvaTransformer(
+        options,
+        _parse_verilog_configs(
+            _collect_import_closure(system), raw_data_cache, import_paths
+        ),
+        _parse_verification_configs([system], raw_data_cache),
+        stimulus,
+    )
+    output = transformer.generate(system)
+    written = transformer.write(output, out_dir)
+    if verbose:
+        for path in written:
+            print(f"  -> {path}")
+    for warning in output.warnings:
+        print(f"Warning: {source_file}: {warning}", file=sys.stderr)
 
 
 def _collect_import_closure(root: NncSystem) -> list[NncSystem]:

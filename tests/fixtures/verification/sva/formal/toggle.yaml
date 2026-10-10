@@ -1,0 +1,51 @@
+# SVA formal fixture for proofs: x toggles 0, 1, 0, 1, ... so every property
+# below holds on runs of any length (formal checks have no end-of-run
+# obligations). Each kind keeps monitor history that induction must handle:
+# - window: the saturating step counter (from_step + window); without the
+#   counter invariant, k-induction starts from a counter above its limit and
+#   fails spuriously;
+# - long_window: 20 rows of pending bits; k-induction needs an induction
+#   length of at least 20 rows, PDR does not;
+# - stays: the then_always age counter (with its invariant).
+module:
+  name: formal_toggle
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - 1 - x -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: bounded
+      always: x >= 0 && x <= 1
+    - id: window
+      eventually: x == 1
+      within: [0, 1]
+      from_step: 3
+    - id: flips
+      when: x == 1
+      then: x == 0
+      after: 1
+    - id: comes_back
+      when: x == 0
+      then: x == 1
+      within: [1, 2]
+    - id: stays
+      when: x == 1
+      then_always: x <= 1
+      after: 2
+    - id: long_window
+      when: x == 0
+      then: x == 1
+      within: [1, 20]
+    - id: late_one
+      cover: x == 1
+      from_step: 4

@@ -32,13 +32,16 @@ VerilogEncoding: TypeAlias = VerilogLogicEncoding | VerilogFixedPointEncoding
 
 
 def encoding_from_parts(
-    emitter: VerilogConversionEmitter,
+    emitter: VerilogConversionEmitter | None,
     kind: str,
     width: int,
     signed: bool,
     frac_bits: int,
 ) -> VerilogEncoding:
-    """Build one resolved encoding object from primitive fields."""
+    """Build one resolved encoding object from primitive fields.
+
+    ``emitter`` is unused; it is kept for the mixin call convention.
+    """
     if kind == "fixed":
         return VerilogFixedPointEncoding(
             kind="fixed",

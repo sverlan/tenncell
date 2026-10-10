@@ -1,0 +1,169 @@
+# SVA monitor fixture: every property kind (always, never, eventually,
+# eventually within, cover, when/then after, when/then within, when/then_always),
+# with and without from_step, passing, failing and still open at the end,
+# including zero bounds, overlapping obligations and satisfaction before the
+# window. The input u has a renamed port and is read by properties through the
+# checker's row-aligned copy. Run with monitors_tb.sv and inputs.csv; results
+# must equal native's.
+#
+# Native trace on all of inputs.csv (row: u, x, count, mode):
+#   0: 0, 0, 0, IDLE   1: 1, 1, 1, IDLE   2: 2, 3, 2, IDLE   3: 5, 8, 3, BUSY
+#   4: 0, 8, 4, IDLE   5: 3, 11, 5, BUSY  6: 0, 11, 6, IDLE
+module:
+  name: sva_monitors
+
+constants:
+  LIMIT: 4
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - x = 0
+      - count = 0
+      - mode = 0
+    input: [u]
+    output: [x, count]
+
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: u > 2
+              then:
+                - BUSY -> mode
+      - BUSY:
+          rules:
+            - IDLE -> mode
+
+rules:
+  - u -> x
+  - count + 1 -> count
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    u: {direction: input, kind: fixed, width: 16, signed: true, rename: u_in}
+    x: {direction: output, kind: fixed, width: 16, signed: true, rename: x_out}
+    count: {direction: output, kind: fixed, width: 16, signed: true}
+
+verification:
+  properties:
+    - id: always_pass
+      always: count >= 0
+    - id: always_fail
+      always: x < 4
+    - id: always_limit
+      always: count <= LIMIT
+    - id: always_scaled
+      always: x * 0.5 < 4
+    - id: always_late
+      always: x < 3
+      from_step: 4
+    - id: never_input
+      never: u == 3
+    - id: never_late
+      never: x == 3
+      from_step: 3
+    - id: eventually_busy
+      eventually: mode == ctrl.BUSY
+    - id: eventually_open
+      eventually: x > 100
+    - id: eventually_late
+      eventually: x == 3
+      from_step: 3
+    - id: within_pass
+      eventually: count == 3
+      within: [1, 4]
+    - id: within_zero
+      eventually: x == 0
+      within: [0, 0]
+    - id: within_fail
+      eventually: x == 7
+      within: [0, 2]
+    - id: within_late_fail
+      eventually: u == 2
+      within: [0, 1]
+      from_step: 3
+    - id: within_open
+      eventually: x > 100
+      within: [2, 50]
+    - id: cover_hit
+      cover: mode == ctrl.BUSY && x == 11
+    - id: cover_late_miss
+      cover: x == 1
+      from_step: 2
+    - id: response_after_zero_pass
+      when: u > 2
+      then: mode == ctrl.BUSY
+      after: 0
+    - id: response_after_zero_fail
+      when: mode == ctrl.BUSY
+      then: u == 5
+      after: 0
+    - id: response_after_fail
+      when: u > 0
+      then: count > 3
+      after: 1
+    - id: response_after_late_pass
+      when: u > 0
+      then: count > 2
+      after: 1
+      from_step: 2
+    - id: response_after_open
+      when: u == 3
+      then: x > 10
+      after: 2
+    - id: response_after_two_fail
+      when: u == 1
+      then: count == 2
+      after: 2
+    - id: response_within_exact_pass
+      when: u == 2
+      then: mode == ctrl.IDLE
+      within: [2, 2]
+    - id: response_within_exact_fail
+      when: u == 1
+      then: x == 1
+      within: [2, 2]
+    - id: response_within_zero
+      when: u == 2
+      then: x == 3
+      within: [0, 0]
+    - id: response_within_pass
+      when: u > 0
+      then: count >= 3
+      within: [0, 3]
+    - id: response_within_fail
+      when: u == 1
+      then: x > 5
+      within: [0, 1]
+    - id: response_within_ignores_early
+      when: u == 1
+      then: x == 1
+      within: [1, 2]
+    - id: response_within_late_window
+      when: u == 2
+      then: mode == ctrl.BUSY
+      within: [2, 3]
+    - id: response_within_open_overlapping
+      when: u > 0
+      then: x > 100
+      within: [1, 10]
+    - id: always_after_pass
+      when: mode == ctrl.BUSY
+      then_always: count >= 3
+    - id: always_after_fail
+      when: u == 5
+      then_always: x == 8
+      after: 1
+    - id: always_after_zero_fail
+      when: u > 0
+      then_always: mode == ctrl.IDLE
+    - id: always_after_late_pass
+      when: u > 0
+      then_always: x > 7
+      from_step: 3

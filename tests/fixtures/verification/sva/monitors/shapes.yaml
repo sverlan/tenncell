@@ -1,0 +1,82 @@
+# SVA fixture: the generic properties of verification/mc2_crosscheck/model.yaml
+# with p and t as inputs, so the MC2 cross-check trace shapes (overlapping
+# triggers, a trigger on the last row, windows cut by the end, persistence end
+# cases, p always or never true) can drive the RTL as input records.
+module:
+  name: sva_shapes
+
+cells:
+  - id: 1
+    contents:
+      - p = 0, t = 0, seen = 0
+    input: [p, t]
+    output: [seen]
+
+rules:
+  - p > 0 | 1 -> seen
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+verification:
+  properties:
+    - id: always
+      always: p > 0
+    - id: always_from3
+      always: p > 0
+      from_step: 3
+    - id: never_from3
+      never: p > 0
+      from_step: 3
+    - id: eventually
+      eventually: p > 0
+    - id: eventually_from3
+      eventually: p > 0
+      from_step: 3
+    - id: within_1_2
+      eventually: p > 0
+      within: [1, 2]
+    - id: within_from3
+      eventually: p > 0
+      within: [0, 1]
+      from_step: 3
+    - id: after_0
+      when: t > 0
+      then: p > 0
+      after: 0
+    - id: after_1
+      when: t > 0
+      then: p > 0
+      after: 1
+    - id: after_2
+      when: t > 0
+      then: p > 0
+      after: 2
+    - id: after_1_from3
+      when: t > 0
+      then: p > 0
+      after: 1
+      from_step: 3
+    - id: response_0_2
+      when: t > 0
+      then: p > 0
+      within: [0, 2]
+    - id: response_1_1
+      when: t > 0
+      then: p > 0
+      within: [1, 1]
+    - id: persists_0
+      when: t > 0
+      then_always: p > 0
+    - id: persists_1
+      when: t > 0
+      then_always: p > 0
+      after: 1
+    - id: persists_2
+      when: t > 0
+      then_always: p > 0
+      after: 2
+    - id: cover
+      cover: p > 0
+    - id: cover_from3
+      cover: p > 0
+      from_step: 3

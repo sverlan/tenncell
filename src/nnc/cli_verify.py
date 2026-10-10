@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import os
 import sys
-from collections.abc import Iterable
 from pathlib import Path
 
 from nnc._version import __version__
 from nnc.cli_transform import _parse_verification_configs
 from nnc.model.system import NncSystem
 from nnc.verification.binding import BoundVerification
+from nnc.verification.records import (
+    iter_records as _records,
+    parse_number as _number,
+    read_input_records,
+)
 from nnc.verification.generic_properties.native import (
     FAIL,
     NATIVE,
@@ -246,53 +249,6 @@ def read_trace(
     return trace
 
 
-def _records(
-    path: Path, delimiter: str, skip_lines: int = 0
-) -> Iterable[tuple[int, list[str]]]:
-    """Yield ``(line number, fields)`` for every non-blank line after the first
-    ``skip_lines`` lines; line numbers count every line of the file."""
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        for _ in range(skip_lines):
-            if not handle.readline():
-                return
-        if delimiter == " ":
-            for line_number, line in enumerate(handle, start=skip_lines + 1):
-                if line.strip():
-                    yield line_number, line.split()
-            return
-        reader = csv.reader(handle, delimiter=delimiter)
-        try:
-            for fields in reader:
-                if not fields or (len(fields) == 1 and not fields[0].strip()):
-                    continue  # a blank or whitespace-only line
-                yield skip_lines + reader.line_num, [field.strip() for field in fields]
-        except csv.Error as error:
-            line_number = skip_lines + reader.line_num
-            raise VerificationError(f"{path}:{line_number}: {error}") from error
-
-
-def _check_header(path: Path, line: int, header: list[str]) -> None:
-    """Reject empty column names in a header."""
-    for index, name in enumerate(header, start=1):
-        if not name:
-            raise VerificationError(f"{path}:{line}: column {index} has an empty name")
-
-
-def _number(
-    path: Path, line: int, column: str, text: str, label: bool = False
-) -> int | float:
-    try:
-        value = float(text)
-    except ValueError:
-        kind = "step label" if label else f"value in column '{column}'"
-        raise VerificationError(
-            f"{path}:{line}: {kind} is not a number: {text!r}"
-        ) from None
-    if label and math.isfinite(value) and value.is_integer():
-        return int(value)  # integral labels are reported as integers
-    return value
-
-
 def _warn_about_gaps(path: Path, labels: list[int | float]) -> None:
     if not all(math.isfinite(label) and float(label).is_integer() for label in labels):
         return
@@ -331,7 +287,8 @@ def simulate_inputs(
     system: NncSystem, path: Path, delimiter: str, skip_lines: int = 0
 ) -> Trace:
     """Simulate a model on input records: row 0 is the initial state, and input
-    record k drives the transition to row k.
+    record k drives the transition to row k. The input columns of row k hold
+    record k, also when a rule consumed (reset) the input variable.
 
     Raises:
         VerificationError: If the model has no inputs, or a record has unknown,
@@ -341,49 +298,33 @@ def simulate_inputs(
         raise VerificationError(
             "--inputs is for models with inputs; this model has none: use --steps"
         )
-    records = list(_records(path, delimiter, skip_lines))
-    if not records:
-        raise VerificationError(f"{path}: input file is empty")
-    header_line, header = records[0]
-    _check_header(path, header_line, header)
-    duplicates = sorted({name for name in header if header.count(name) > 1})
-    if duplicates:
-        raise VerificationError(
-            f"{path}:{header_line}: duplicate input columns: {', '.join(duplicates)}"
-        )
-    unknown = [name for name in header if name not in system.input_variables]
-    if unknown:
-        raise VerificationError(f"{path}: unknown input columns: {', '.join(unknown)}")
-    missing = [name for name in system.input_variables if name not in header]
-    if missing:
-        raise VerificationError(f"{path}: missing input columns: {', '.join(missing)}")
     rows = [_snapshot(system)]
-    for line, fields in records[1:]:
-        if len(fields) != len(header):
-            raise VerificationError(
-                f"{path}:{line}: expected {len(header)} fields, found {len(fields)}"
-            )
-        system.step(
-            {
-                name: _number(path, line, name, text)
-                for name, text in zip(header, fields)
-            }
-        )
-        rows.append(_snapshot(system))
+    for _, inputs in read_input_records(system, path, delimiter, skip_lines):
+        system.step(inputs)
+        # The row holds the step's input even when a rule consumed it.
+        rows.append({**_snapshot(system), **inputs})
     return Trace(list(range(len(rows))), rows)
 
 
 def _snapshot(system: NncSystem) -> dict[str, float]:
-    """Return all local variables plus imported inputs/outputs as ``alias__port``."""
+    """Return all local variables plus imported inputs/outputs as ``alias__port``.
+
+    An imported input holds the value the parent gave the child in the step
+    that produced the row, also when the child consumed it (row 0: its
+    initial value), like a root input.
+    """
     row = {
         name: float(variable.value.value) for name, variable in system.variables.items()
     }
+    given = system.last_import_inputs
     for item in system.imports:
         if item.system is None:
             continue
         ports = {**item.system.input_variables, **item.system.output_variables}
         for port, variable in ports.items():
             row[f"{item.alias}__{port}"] = float(variable.value.value)
+        for port, value in given.get(item.alias, {}).items():
+            row[f"{item.alias}__{port}"] = float(value)
     return row
 
 

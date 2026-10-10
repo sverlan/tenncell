@@ -1,0 +1,29 @@
+# SVA fixture: the RTL instantiates an external module (uart), whose source is
+# not generated; without --sva-source the SVA backend warns about it.
+module:
+  name: sva_external_root
+  zero_reset_mode: true
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding: {kind: fixed_point, signed: true, width: 32, frac_bits: 16}
+  ports:
+    flag: {direction: output, kind: fixed, width: 32, signed: true}
+  externals:
+    uart0:
+      header: uart.header.yaml
+      connections:
+        clk: clk
+        ready: uart_ready
+cells:
+  - id: 1
+    contents:
+      - flag = 0
+      - uart_ready = 0
+    output: [flag]
+rules:
+  - uart_ready == 1 | 1 -> flag
+verification:
+  properties:
+    - id: flag_bounded
+      always: flag <= 1

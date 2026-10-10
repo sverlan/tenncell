@@ -1,0 +1,41 @@
+# SVA formal fixture with a free input: x takes the input of each step
+# (x * 0 resets it, then u -> x adds the input), so on every row x equals the
+# input that produced it. The environment range bounds the live input port;
+# properties read the input through the checker's row-aligned copy.
+# - x_follows_input holds only if the copy is aligned with the row (an
+#   off-by-one copy would compare x with the next or previous input);
+# - input_in_range and x_in_range hold only under the range assumption;
+# - input_never_max fails: the solver may choose u = 5.
+module:
+  name: formal_follow
+
+cells:
+  - id: 1
+    contents:
+      - u = 0, x = 0
+    input: [u]
+    output: [x]
+
+rules:
+  - u -> x
+  - x * 0 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    u: {direction: input, kind: fixed, width: 16, signed: true, rename: u_in}
+    x: {direction: output, kind: fixed, width: 16, signed: true}
+
+verification:
+  environment:
+    u:
+      range: [0, 5]
+  properties:
+    - id: x_follows_input
+      always: x == u
+    - id: input_in_range
+      always: u >= 0 && u <= 5
+    - id: x_in_range
+      always: x >= 0 && x <= 5
+    - id: input_never_max
+      never: u == 5

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from ....model.system import NncSystem
 from ..hardware_config import ExternalInstance, PortConfig
+from .conversions import port_declared_signed
+from .references import boundary_wire_name
 
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
@@ -197,7 +199,7 @@ class VerilogStructuralEmitter:
 
     def _port_decl(self, port: PortConfig) -> str:
         """Render one Verilog port declaration."""
-        signed = " signed" if port.signed and port.width > 1 else ""
+        signed = " signed" if port_declared_signed(port.width, port.signed) else ""
         width = "" if port.width == 1 else f" [{port.width - 1}:0]"
         return f"{port.dir} logic{signed}{width} {port.verilog_name}"
 
@@ -209,13 +211,13 @@ class VerilogStructuralEmitter:
             imported = item.system
             port_map = self._port_map_for(imported)
             for output_name in imported.output_variables.keys():
-                wire_name = f"{item.alias}__{output_name}"
+                wire_name = boundary_wire_name(item.alias, output_name)
                 imported_port = port_map.get(output_name)
                 if imported_port is None:
                     continue
                 signed = (
                     " signed"
-                    if imported_port.signed and imported_port.width > 1
+                    if port_declared_signed(imported_port.width, imported_port.signed)
                     else ""
                 )
                 width = (
@@ -225,7 +227,9 @@ class VerilogStructuralEmitter:
                 )
                 self.add_line(f"logic{signed}{width} {wire_name};")
         for target_ref, (_, port) in ctx.import_output_bindings.items():
-            signed = " signed" if port.signed and port.width > 1 else ""
+            if target_ref in ctx.top_ports:
+                continue  # an output port: declared in the header, driven by _emit_outputs
+            signed = " signed" if port_declared_signed(port.width, port.signed) else ""
             width = "" if port.width == 1 else f" [{port.width - 1}:0]"
             self.add_line(f"logic{signed}{width} {target_ref};")
         if ctx.system.imports or ctx.import_output_bindings:
@@ -244,11 +248,13 @@ class VerilogStructuralEmitter:
             for output_name in imported.output_variables.keys():
                 if output_name not in ctx.import_output_bindings:
                     continue
+                if output_name in ctx.top_ports:
+                    continue  # the output port is assigned by _emit_outputs
                 imported_port = imported_ports.get(output_name)
                 if imported_port is None:
                     continue
                 target_signal = output_name
-                source_signal = f"{item.alias}__{output_name}"
+                source_signal = boundary_wire_name(item.alias, output_name)
                 _, target_port = ctx.import_output_bindings[output_name]
                 converted = self._external_output_to_target(
                     source_signal,
@@ -281,13 +287,19 @@ class VerilogStructuralEmitter:
                 )
             for port in item.definition.ports:
                 if port.dir == "output":
-                    signed = " signed" if port.signed and port.width > 1 else ""
+                    signed = (
+                        " signed"
+                        if port_declared_signed(port.width, port.signed)
+                        else ""
+                    )
                     width = "" if port.width == 1 else f" [{port.width - 1}:0]"
-                    self.add_line(f"logic{signed}{width} {item.alias}__{port.name};")
+                    self.add_line(
+                        f"logic{signed}{width} {boundary_wire_name(item.alias, port.name)};"
+                    )
         for target_ref, (_, port) in ctx.external_output_bindings.items():
             if target_ref in ctx.top_ports:
                 continue
-            signed = " signed" if port.signed and port.width > 1 else ""
+            signed = " signed" if port_declared_signed(port.width, port.signed) else ""
             width = "" if port.width == 1 else f" [{port.width - 1}:0]"
             self.add_line(f"logic{signed}{width} {target_ref};")
         if ctx.config.externals:
@@ -313,7 +325,7 @@ class VerilogStructuralEmitter:
                     continue
                 if "." not in target_ref and target_ref in output_names:
                     continue
-                source_signal = f"{item.alias}__{port.name}"
+                source_signal = boundary_wire_name(item.alias, port.name)
                 assert config.real_encoding is not None
                 source_frac_bits = (
                     config.real_encoding.frac_bits if port.kind == "fixed" else 0
@@ -375,10 +387,18 @@ class VerilogStructuralEmitter:
                 if imported_port is None:
                     continue
                 connections.append(
-                    f".{input_name}({self._resolve_connection(ref, imported_port.kind, imported_port.width, imported_port.signed, 0 if imported_port.kind != 'fixed' else imported_config.real_encoding.frac_bits, ctx)})"
+                    f".{imported_port.verilog_name}({self._resolve_connection(ref, imported_port.kind, imported_port.width, imported_port.signed, 0 if imported_port.kind != 'fixed' else imported_config.real_encoding.frac_bits, ctx)})"
                 )
             for output_name in imported.output_variables.keys():
-                connections.append(f".{output_name}({item.alias}__{output_name})")
+                imported_port = imported_ports.get(output_name)
+                port_name = (
+                    imported_port.verilog_name
+                    if imported_port is not None
+                    else output_name
+                )
+                connections.append(
+                    f".{port_name}({boundary_wire_name(item.alias, output_name)})"
+                )
             for index, conn in enumerate(connections):
                 suffix = "," if index < len(connections) - 1 else ""
                 self.add_line(f"{conn}{suffix}", 1)
@@ -408,7 +428,7 @@ class VerilogStructuralEmitter:
             connections = []
             for port in header.ports:
                 if port.dir == "output":
-                    target = f"{item.alias}__{port.name}"
+                    target = boundary_wire_name(item.alias, port.name)
                 else:
                     target = self._resolve_connection(
                         item.connections.get(port.name, "0"),
@@ -425,6 +445,32 @@ class VerilogStructuralEmitter:
             self.add_line(");")
             self.add_line()
 
+    def _output_source_to_port(
+        self, output_name: str, top_port: PortConfig, ctx: VerilogEmissionContext
+    ) -> str:
+        """Return the output port's value: its source signal converted from the
+        source's actual encoding to the port's (a plain signal when they match).
+
+        The source is the signal rules write: the ``state_<name>`` register, or
+        a binding wire driven by an imported or external output.
+        """
+        source_signal = self._variable_signal_name(output_name, ctx)
+        source_encoding = (
+            self._variable_state_encoding(output_name, ctx)
+            if output_name in ctx.local_variables
+            else self._variable_expression_encoding(output_name, ctx)
+        )
+        assert ctx.config.real_encoding is not None
+        target_encoding = self._encoding_from_parts(
+            top_port.kind,
+            top_port.width,
+            top_port.signed,
+            ctx.config.real_encoding.frac_bits if top_port.kind == "fixed" else 0,
+        )
+        return self._convert_signal_by_encoding(
+            source_signal, source_encoding, target_encoding, ctx
+        )
+
     def _emit_outputs(self, ctx: VerilogEmissionContext | None = None):
         """Emit the top-level output assignments for the generated module."""
         ctx = ctx or self._emission_context
@@ -437,7 +483,7 @@ class VerilogStructuralEmitter:
             external_assignment = None
             if output_name in ctx.import_output_bindings:
                 alias, port = ctx.import_output_bindings[output_name]
-                source_signal = f"{alias}__{port.name}"
+                source_signal = boundary_wire_name(alias, port.name)
                 imported_config = None
                 for item in ctx.system.imports:
                     if item.alias == alias:
@@ -469,7 +515,7 @@ class VerilogStructuralEmitter:
                         continue
                     if item.connections.get(port.name) != output_name:
                         continue
-                    source_signal = f"{item.alias}__{port.name}"
+                    source_signal = boundary_wire_name(item.alias, port.name)
                     assert config.real_encoding is not None
                     external_assignment = self._external_output_to_target(
                         source_signal,
@@ -490,7 +536,7 @@ class VerilogStructuralEmitter:
                     break
             if external_assignment is None:
                 self.add_line(
-                    f"assign {top_port.verilog_name} = {self._convert_local_fixed_to_target(output_name, top_port.kind, top_port.width, top_port.signed, ctx)};"
+                    f"assign {top_port.verilog_name} = {self._output_source_to_port(output_name, top_port, ctx)};"
                 )
             else:
                 self.add_line(

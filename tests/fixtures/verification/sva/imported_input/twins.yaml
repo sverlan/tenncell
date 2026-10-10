@@ -1,0 +1,36 @@
+# Two imports of the same file (child.yaml copies its input into y) are two
+# instances with their own state: c0 copies x, c1 copies the constant FIVE.
+module:
+  name: imported_input_twins
+
+constants:
+  FIVE: 5
+
+imports:
+  - module: child.yaml
+    as: c0
+    connections:
+      a: x
+  - module: child.yaml
+    as: c1
+    connections:
+      a: FIVE
+
+cells:
+  - id: 1
+    contents:
+      - x = 0
+    output: [x]
+
+rules:
+  - x + 1 -> x
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+
+verification:
+  properties:
+    - id: twins_differ
+      always: c1.y == 5 || c1.y == 0
+    - id: first_follows_x
+      always: c0.y + 1 == x || x == 0

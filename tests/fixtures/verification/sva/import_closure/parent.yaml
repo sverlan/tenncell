@@ -1,0 +1,24 @@
+# SVA fixture: a model with an import, so the RTL closure has two modules
+# (parent.sv and child.sv), written exactly as nnc-gen -t verilog writes them.
+module:
+  name: parent
+imports:
+  - module: child.yaml
+    as: c0
+    connections:
+      a: u
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - z = 0
+    input: [u]
+    output: [z]
+rules:
+  - c0.y -> z
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+verification:
+  properties:
+    - id: follows_child
+      always: z == c0.y

@@ -10,11 +10,6 @@ module top_io_demo #(
     output logic [7:0] alarm
 );
 
-function automatic logic [7:0] conv_sfixed_32_16_to_logic_8(
-    input logic signed [31:0] value
-);
-    conv_sfixed_32_16_to_logic_8 = (value >>> 16);
-endfunction
 logic [7:0] state_alarm;
 logic [7:0] state_alarm_next;
 logic [7:0] state_alarm_prod;
@@ -45,6 +40,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign alarm = conv_sfixed_32_16_to_logic_8(state_alarm);
+assign alarm = state_alarm;
 
 endmodule

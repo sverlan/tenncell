@@ -1,0 +1,23 @@
+# Imported child for converted_import/root.yaml (copy of the Verilog
+# helper_generated_literals child): a 32-bit logic input `sig`.
+module:
+  name: child
+verilog:
+  clock: clk
+  reset: rst
+  real_encoding:
+    kind: fixed_point
+    signed: true
+    width: 32
+    frac_bits: 16
+  ports:
+    sig:
+      direction: input
+      width: 32
+      signed: true
+cells:
+  - id: 1
+    contents:
+      - sig = 0
+    input: [sig]
+rules: []

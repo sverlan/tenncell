@@ -19,11 +19,6 @@ localparam logic [39:0] _VAL_0_0 = 40'd0;
 localparam logic [39:0] _VAL_1_0 = 40'd1024;
 // _VAL_27000000_0 = 27000000.0 in fixed-point Q30.10
 localparam logic [39:0] _VAL_27000000_0 = 40'd27648000000;
-function automatic logic conv_ufixed_40_10_to_logic(
-    input logic [39:0] value
-);
-    conv_ufixed_40_10_to_logic = (value != '0);
-endfunction
 logic [7:0] txdrv0__tx_data;
 logic txdrv0__tx_valid;
 logic [7:0] tx_data;
@@ -126,7 +121,7 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign led = conv_ufixed_40_10_to_logic(state_led);
+assign led = state_led;
 assign uart_tx = uart_tx0__tx;
 
 endmodule

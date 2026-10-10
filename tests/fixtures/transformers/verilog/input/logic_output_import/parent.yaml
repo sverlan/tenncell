@@ -1,0 +1,20 @@
+# Verilog fixture: parent outputs driven by an imported child. f goes from the
+# child's fixed-point output to an 8-bit logic port (a real conversion: 3.0 ->
+# 3); g goes from a 4-bit logic output to an 8-bit logic port (5 -> 5)
+# (tests/fixtures/transformers/verilog/sim/logic_output_import_tb.sv).
+module:
+  name: logic_output_parent
+imports:
+  - module: child.yaml
+    as: c0
+cells:
+  - id: 1
+    contents:
+      - f = 0
+      - g = 0
+    output: [f, g]
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    f: {direction: output, kind: logic, width: 8, signed: false}
+    g: {direction: output, kind: logic, width: 8, signed: false}

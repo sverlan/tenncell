@@ -1,0 +1,23 @@
+# Verilog fixture: a signed multi-bit logic variable holding -1. Its register
+# must be declared signed, so `x < 0` is a signed comparison and `neg` becomes 1
+# after the first step (tests/fixtures/transformers/verilog/sim/signed_logic_tb.sv).
+cells:
+  - id: 1
+    contents:
+      - x = -1
+      - neg = 0
+    output: [neg]
+
+rules:
+  - x -> x
+  - x < 0 | 1 -> neg
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  types:
+    x:
+      kind: logic
+      signed: true
+      width: 8
+  ports:
+    neg: {direction: output, kind: logic, width: 8, signed: true}

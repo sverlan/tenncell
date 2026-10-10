@@ -10,14 +10,9 @@ module zero_reset_input_demo #(
     output logic signed [31:0] out
 );
 
-function automatic logic [31:0] conv_sfixed_32_16_to_logic_32(
-    input logic signed [31:0] value
-);
-    conv_sfixed_32_16_to_logic_32 = (value >>> 16);
-endfunction
-logic [31:0] state_out;
-logic [31:0] state_out_next;
-logic [31:0] state_out_prod;
+logic signed [31:0] state_out;
+logic signed [31:0] state_out_next;
+logic signed [31:0] state_out_prod;
 
 always_comb begin
     state_out_prod = '0;
@@ -40,6 +35,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign out = conv_sfixed_32_16_to_logic_32(state_out);
+assign out = state_out;
 
 endmodule

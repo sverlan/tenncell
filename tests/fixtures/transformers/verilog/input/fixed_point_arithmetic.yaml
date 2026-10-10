@@ -1,0 +1,27 @@
+# Verilog fixture: multiplication and division by constants in fixed point.
+# A Q8.8 product has 16 fractional bits, so it must be computed in double width
+# and shifted back; a quotient needs the dividend shifted first. With x = -3,
+# one step gives (tests/fixtures/transformers/verilog/sim/fixed_point_arithmetic_tb.sv):
+# y = x * 2 = -6, z = x * 0.5 = -1.5, big = x * 40 = -120, q = x / 4 = -0.75,
+# and flag = 1 because x * 0.5 < -1 (product inside a guard).
+cells:
+  - id: 1
+    contents:
+      - x = -3
+      - y = 0
+      - z = 0
+      - big = 0
+      - q = 0
+      - flag = 0
+    output: [y, z, big, q, flag]
+
+rules:
+  - x -> x
+  - x * 2 -> y
+  - x * 0.5 -> z
+  - x * 40 -> big
+  - x / 4 -> q
+  - x * 0.5 < -1 | 1 -> flag
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}

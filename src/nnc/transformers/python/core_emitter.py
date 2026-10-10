@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ...inputs.yaml.module_config import connection_number
 from ...model.system import NncSystem
 from .emission_context import PythonEmissionContext
 from .expression_emitter import UnsupportedFunctionError
@@ -126,17 +127,27 @@ class PythonCoreEmitter:
         self.add_line()
 
     def _emit_import_steps(self, system: NncSystem, indent: int):
-        """Emit recursive step calls for imported TENNCell modules."""
+        """Emit recursive step calls for imported TENNCell modules.
+
+        All imports are given values of the configuration before the step
+        (including other imports' outputs) before any of them steps, as in
+        ``NncSystem.step``.
+        """
         imports = getattr(system, "__dict__", {}).get("imports", [])
         if not imports:
             return
-        for item in system._direct_import_step_order():
+        self.add_line(
+            "# Every import reads the configuration before this step.", indent
+        )
+        for item in imports:
             assert item.system is not None
             child_inputs = []
             for input_name in item.system.input_variables.keys():
                 ref = item.connections.get(input_name)
                 if ref is None:
                     child_inputs.append(f"'{input_name}': 0.0")
+                elif connection_number(ref) is not None:
+                    child_inputs.append(f"'{input_name}': {connection_number(ref)!r}")
                 elif "." in ref:
                     child_inputs.append(
                         f"'{input_name}': float({self._reference_code(ref)})"
@@ -145,12 +156,14 @@ class PythonCoreEmitter:
                     child_inputs.append(
                         f"'{input_name}': {system.constants[ref].value}"
                     )
-                elif ref.replace(".", "", 1).lstrip("-").isdigit():
-                    child_inputs.append(f"'{input_name}': {float(ref)}")
                 else:
                     child_inputs.append(f"'{input_name}': float(self.{ref})")
             self.add_line(
-                f"self._import_{item.alias}.step({{{', '.join(child_inputs)}}})", indent
+                f"_inputs_{item.alias} = {{{', '.join(child_inputs)}}}", indent
+            )
+        for item in imports:
+            self.add_line(
+                f"self._import_{item.alias}.step(_inputs_{item.alias})", indent
             )
         self.add_line()
 

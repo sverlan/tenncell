@@ -64,6 +64,6 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
-assign y = conv_ufixed_16_8_to_logic_16(state_y);
+assign y = state_y;
 
 endmodule

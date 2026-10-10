@@ -1,0 +1,69 @@
+# SVA concurrent-style fixture limited to the forms Verilator 5 runs: plain
+# assertions and implications without sequence operators (always, never,
+# zero-bound responses), with from_step. The model is monitors.yaml's; run it
+# with inputs.csv. Each failing assertion reports `SVA_FAIL <id> row <row>`
+# on every failing row; the first row equals native's reported row.
+module:
+  name: sva_concurrent_basic
+
+cells:
+  - id: 1
+    contents:
+      - u = 0
+      - x = 0
+      - count = 0
+      - mode = 0
+    input: [u]
+    output: [x, count]
+
+fsm:
+  - name: ctrl
+    variable: mode
+    initial: IDLE
+    states:
+      - IDLE:
+          rules:
+            - if: u > 2
+              then:
+                - BUSY -> mode
+      - BUSY:
+          rules:
+            - IDLE -> mode
+
+rules:
+  - u -> x
+  - count + 1 -> count
+
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+  ports:
+    u: {direction: input, kind: fixed, width: 16, signed: true, rename: u_in}
+    x: {direction: output, kind: fixed, width: 16, signed: true, rename: x_out}
+    count: {direction: output, kind: fixed, width: 16, signed: true}
+
+verification:
+  properties:
+    - id: always_pass
+      always: count >= 0
+    - id: always_fail
+      always: x < 4
+    - id: always_late
+      always: x < 3
+      from_step: 4
+    - id: never_input
+      never: u == 3
+    - id: never_late
+      never: x == 3
+      from_step: 3
+    - id: response_after_zero_pass
+      when: u > 2
+      then: mode == ctrl.BUSY
+      after: 0
+    - id: response_after_zero_fail
+      when: mode == ctrl.BUSY
+      then: u == 5
+      after: 0
+    - id: response_within_zero
+      when: u == 2
+      then: x == 3
+      within: [0, 0]

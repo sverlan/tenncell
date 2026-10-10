@@ -10,7 +10,9 @@ from ..hardware_config import (
     VerilogFixedPointEncoding,
     VerilogLogicEncoding,
 )
+from ....inputs.yaml.module_config import connection_number
 from .encodings import encoding_from_parts
+from .literals import emit_constant_in_encoding
 
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
@@ -58,6 +60,11 @@ def variable_state_encoding(
     return enc.to_verilog_encoding()
 
 
+def boundary_wire_name(alias: str, port_name: str) -> str:
+    """Return the parent wire carrying an imported or external output."""
+    return f"{alias}__{port_name}"
+
+
 def reference_signal_name(emitter: VerilogReferenceResolver, reference: str) -> str:
     """Convert a dotted TENNCell reference into a Verilog signal name."""
     return reference.replace(".", "__")
@@ -77,8 +84,12 @@ def resolve_connection(
     target_encoding = encoding_from_parts(
         emitter, target_kind, target_width, target_signed, target_frac_bits
     )
-    if reference == "0":
+    if reference is None or reference == "0":  # not connected, or zero
         return "0"
+    number = connection_number(reference)
+    if number is not None:  # encoded like a constant of the target port
+        assert ctx is not None
+        return emit_constant_in_encoding(emitter, number, target_encoding, ctx)
     if "." in reference:
         signal = reference_signal(emitter, reference)
         return maybe_convert_signal(emitter, reference, signal, target_encoding, ctx)
@@ -178,40 +189,6 @@ def top_port_signal_name(
     port = top_port_config(emitter, port_name, ctx)
     assert port is not None
     return port.verilog_name
-
-
-def convert_local_fixed_to_target(
-    emitter: VerilogReferenceResolver,
-    signal_name: str,
-    target_kind: str,
-    target_width: int,
-    target_signed: bool,
-    ctx: VerilogEmissionContext | None = None,
-) -> str:
-    """Convert a local fixed-point signal to the target boundary type."""
-    ctx = ctx or emitter._emission_context
-    assert ctx is not None
-    signal = emitter._state_name(signal_name)
-    enc = ctx.config.real_encoding
-    assert enc is not None
-    if (
-        target_kind == "fixed"
-        and target_width == enc.width
-        and target_signed == enc.signed
-    ):
-        return signal
-    helper_name = emitter._conversion_helper_name(
-        "fixed",
-        enc.width,
-        enc.signed,
-        enc.frac_bits,
-        target_kind,
-        target_width,
-        target_signed,
-        0,
-        ctx,
-    )
-    return f"{helper_name}({signal})"
 
 
 def external_output_to_target(
@@ -459,18 +436,6 @@ class VerilogReferenceResolver:
         self, port_name: str, ctx: VerilogEmissionContext | None = None
     ) -> str:
         return top_port_signal_name(self, port_name, ctx)
-
-    def _convert_local_fixed_to_target(
-        self,
-        signal_name: str,
-        target_kind: str,
-        target_width: int,
-        target_signed: bool,
-        ctx: VerilogEmissionContext | None = None,
-    ) -> str:
-        return convert_local_fixed_to_target(
-            self, signal_name, target_kind, target_width, target_signed, ctx
-        )
 
     def _external_output_to_target(
         self,

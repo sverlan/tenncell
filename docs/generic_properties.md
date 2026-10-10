@@ -5,9 +5,8 @@ TENNCell model, and what each property means exactly. It is a user guide. The
 normative specification is `docs/verification.md` (sections 4, 6 and 7), and
 the implemented rules are summarized in `rules.md`.
 
-Every result shown in the examples below was produced by running the `native`
-checker (`nnc-verify`) and the MC2 translator (`nnc-gen -t mc2`) on the traces
-shown.
+The examples below use the `native` checker (`nnc-verify`), the MC2 translator
+(`nnc-gen -t mc2`) and the SVA backend (`nnc-gen -t sva`).
 
 ## Contents
 
@@ -30,14 +29,16 @@ shown.
 ## 1. Overview
 
 A generic property states something that must hold (or, for `cover`, that
-should be reached) along a **finite run** of the model: a sequence of rows,
-one per step. Properties are written once, in TENNCell's own expression
-syntax, and can then be
+should be reached) along a run of the model: a sequence of rows, one per step.
+The native and MC2 backends check finite traces; SVA simulation does the same,
+while SVA formal proofs range over generated RTL runs and its `live` task uses
+infinite-run semantics. Properties are written once, in TENNCell's own
+expression syntax, and can then be
 
 - **checked** directly by the built-in `native` checker, with `nnc-verify`,
   on a simulated run or on a recorded trace;
-- **translated** to other tools: today to MC2 queries (`nnc-gen -t mc2`);
-  SystemVerilog assertions (`sva`) are planned.
+- **translated** to MC2 queries (`nnc-gen -t mc2`) or checked against the
+  generated RTL by simulation or formal tools (`nnc-gen -t sva`).
 
 There are eight kinds, each a fixed temporal pattern:
 
@@ -235,7 +236,12 @@ imported inputs/outputs as `alias__port`.
 ### 5.2 Inputs in simulated rows
 
 In a simulated row `k >= 1`, an **input column holds the input of the step
-that produced row `k`**, next to the state **after** that step. With this run
+that produced row `k`**, next to the state **after** that step. This holds even
+when a rule consumes the input, and also for an imported module's input
+(`alias.port`): its column holds the value the parent gave the child in that
+step, for example a parent register's value from row `k - 1`. All imports are
+given values from before the step, so an import reading another import's
+output sees it one row later. With this run
 of the controller from section 11:
 
 | row | 0 | 1 | 2 | 3 |
@@ -760,8 +766,91 @@ columns to `<stem>.mc2.columns`.
 
 ### 9.4 `sva`
 
-Planned. A property that targets only `sva` is currently reported as
-`skipped` by `nnc-verify` and omitted by `nnc-gen -t mc2`.
+The SVA backend checks the generated fixed-point RTL, not the floating-point
+Python model. It generates files only; it does not invoke a simulator or a
+formal tool.
+
+For a model with inputs, give the simulation records with `--sva-inputs`.
+For an autonomous model, give the number of steps with `--sva-steps`:
+
+```text
+nnc-gen model.yaml -t sva --sva-inputs inputs.csv -o out
+nnc-gen model.yaml -t sva --sva-steps 20 -o out
+cd out
+iverilog -g2012 -o sim.vvp *.sv
+vvp sim.vvp
+```
+
+Monitor style (the default) prints `SVA_RESULT` and `SVA_OPEN` records with the
+same finite-trace statuses and row meanings as `nnc-verify`. Input values are
+encoded for the RTL in `<stem>_inputs.hex`; `<stem>_inputs_decoded.csv` contains
+the quantized values to use for a fair native comparison. Fixed-point rounding
+and overflow can still make RTL and native results differ. `--sva-style
+concurrent` instead emits `assert property`/`cover property` for tools with
+full concurrent-SVA support; it is simulation-only, strict-only, and has no
+native-equivalent result recorder.
+
+Formal mode writes the checker, bind file and `<stem>.sby`:
+
+```text
+nnc-gen model.yaml -t sva --sva-mode formal --sva-depth 20 -o out
+cd out
+sby -f model.sby bmc
+sby -f model.sby cover
+sby -f model.sby prove_kind
+sby -f model.sby prove_pdr
+sby -f model.sby live
+```
+
+`bmc` and `cover` explore property rows `0..D-1`, where `D` is
+`--sva-depth`. `prove_kind` and `prove_pdr` check safety properties for runs of
+any length; only `PASS` means proved. The `live` task checks unbounded
+`eventually` properties and requires the `suprove` engine. If `suprove` is not
+installed, run the other tasks by name rather than running every task at once.
+Formal checks have no strict/weak end-of-trace distinction: an obligation whose
+window extends beyond the bounded horizon is not a failure. Input ranges under
+`verification.environment` become assumptions on the live RTL input ports.
+
+The task status means:
+
+| Task | `PASS` | `FAIL` / `UNKNOWN` |
+|---|---|---|
+| `bmc` | no assertion failure was found in rows `0..D-1` | `FAIL`: a bounded counterexample was found |
+| `cover` | every reachable cover objective was reached within the depth | `FAIL`: at least one objective was not reached within the depth |
+| `prove_kind` | all safety assertions were proved by k-induction | `UNKNOWN`: the chosen induction length was insufficient; increase `--sva-depth` or try PDR |
+| `prove_pdr` | all safety assertions were proved by PDR | anything other than `PASS` is not a proof |
+| `live` | every unbounded `eventually` property holds on every infinite run | `FAIL`: at least one does not; the aggregate task does not identify which one |
+
+Run one task at a time while diagnosing a model. A failing assertion makes the
+combined BMC/proof result fail; similarly, all liveness properties share one
+`live` result. Temporarily target or retain one property when the aggregate
+result does not identify it. See `docs/sva_workflows.md` for complete passing,
+failing, cover and replay tutorials with expected output.
+
+A BMC counterexample or cover witness can be turned into a self-checking RTL
+simulation:
+
+```text
+nnc-gen model.yaml -t sva --sva-replay out/model_bmc/engine_0/trace.yw -o replay
+```
+
+The generated testbench reports `SVA_REPLAY reproduced on row N`, or fails if
+the expected failure/cover is not reproduced. `nnc-gen` still does not run the
+simulator. Run `nnc-verify` on the decoded replay inputs to see whether the
+floating-point model agrees with the RTL; disagreement is diagnostic, not a
+replay failure.
+
+Function calls, variable-by-variable multiplication, non-signal observations,
+and bounds above `--sva-max-bound` are unsupported. Such a property is an error
+when it explicitly targets `sva`, and otherwise is skipped with a warning.
+Raw entries under `verification.backends.sva.raw` are inserted at checker
+module scope after `${name}` placeholders are bound to checker-visible signals
+or encoded constants; their tool compatibility is the user's responsibility.
+The complete file, scheduling, tool-support and replay contracts are in
+`rules.md`, section "SVA Backend". A runnable example is
+`examples/verification/sva_flag.yaml`; the deliberately failing replay
+example is `examples/verification/sva_failure.yaml`. Their complete workflows
+are in `docs/sva_workflows.md`.
 
 ## 10. Errors that are not failures
 

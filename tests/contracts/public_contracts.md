@@ -27,8 +27,15 @@ descriptions, and that tests should treat as the current public contract.
 
 - `nnc.transformers.BaseTransformer`
 - `nnc.transformers.PythonTransformer`
-- `nnc.transformers.VerilogTransformer`
+- `nnc.transformers.VerilogTransformer` (including `observe(system)`, which
+  returns a `VerilogObservation`; `VerilogObservation`, `ObservedSignal` and
+  `ObservedSignalKind` are exported from `nnc.transformers.verilog`)
 - `nnc.transformers.WebotsTransformer`
+- `nnc.transformers.SvaTransformer` (`generate(system)` returns
+  `nnc.transformers.sva_transformer.SvaOutput`; `write(output, out_dir)`),
+  configured with `nnc.verification.sva.SvaOptions`; invalid options raise
+  `nnc.verification.sva.SvaOptionsError`. The `-t sva` command line is not
+  exposed yet.
 
 ## Verilog config model
 
