@@ -35,7 +35,9 @@ class WebotsBindingConfig:
     """Describe one TENNCell variable bound to a Webots device.
 
     Args:
-        device: Webots device name passed to ``robot.getDevice()``.
+        device: Webots device name passed to ``robot.getDevice()``, or
+            ``None`` for a virtual device that ``webots.code.setup`` puts into
+            ``devices`` (the controller does not call ``getDevice``).
         read_method: Optional method called on the device to read a TENNCell input.
         write_method: Optional method called on the device to write a TENNCell
             output or initialization value.
@@ -46,9 +48,26 @@ class WebotsBindingConfig:
         have a write method before code generation.
     """
 
-    device: str
+    device: str | None
     read_method: str | None = None
     write_method: str | None = None
+
+
+CODE_POINTS = ("module", "setup", "before_step", "after_step", "shutdown")
+
+
+@dataclass(slots=True)
+class WebotsCodeBlock:
+    """User Python code pasted at one insertion point of the controller.
+
+    Args:
+        text: The code, dedented, without trailing blank lines.
+        source: ``inline`` or the file path as written in YAML (for the
+            marker comments).
+    """
+
+    text: str
+    source: str
 
 
 @dataclass(slots=True)
@@ -63,6 +82,13 @@ class WebotsConfig:
         bindings: Mapping from TENNCell variable names to Webots device bindings.
         init: One-time initialization values written before the controller loop.
         csv: Optional CSV logging configuration.
+        code: User code by insertion point (``CODE_POINTS``); points without
+            code are absent.
+        warnings: Located parse warnings (for example a binding method that
+            is an expression), reported by the transformer.
+        where: ``"file:line: "`` prefixes of YAML paths under ``webots``
+            (the section, bindings, init entries, CSV variables), for errors
+            found later by the transformer.
 
     Validation assumptions:
         The Webots YAML parser supplies normalized special values such as
@@ -75,3 +101,15 @@ class WebotsConfig:
     bindings: dict[str, WebotsBindingConfig] = field(default_factory=dict)
     init: dict[str, object] = field(default_factory=dict)
     csv: WebotsCsvConfig | None = None
+    code: dict[str, WebotsCodeBlock] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    where: dict[tuple[str, ...], str] = field(default_factory=dict)
+
+    def at(self, *path: str) -> str:
+        """``"file:line: "`` of a YAML path under ``webots`` (for example
+        ``("bindings", "x")``), falling back to its parents, or ``""``."""
+        for end in range(len(path), -1, -1):
+            location = self.where.get(path[:end])
+            if location:
+                return location
+        return ""

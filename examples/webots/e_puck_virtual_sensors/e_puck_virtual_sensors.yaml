@@ -1,0 +1,87 @@
+# e-puck obstacle avoidance with virtual devices and pasted Python code.
+#
+# The model sees two inputs, the closest obstacle on the left and on the right.
+# Neither is a single Webots device: each combines three proximity sensors
+# (left: ps5, ps6, ps7; right: ps0, ps1, ps2). Their bindings have no
+# `device`, and webots.code.setup provides them as `Combined` objects (see
+# code/devices.py). The wheels are real devices; setup gives them a
+# `set_speed` method that clamps the model's speed to the e-puck's limits.
+#
+# Generate the controller, then place it as
+# controllers/e_puck_virtual_sensors/e_puck_virtual_sensors.py in a Webots
+# project whose e-puck uses controller "e_puck_virtual_sensors":
+#   nnc-gen examples/webots/e_puck_virtual_sensors/e_puck_virtual_sensors.yaml -t webots -o out
+# See docs/webots_tutorial.md.
+module:
+  name: e_puck_virtual_sensors
+  description: e-puck obstacle avoidance reading combined proximity sensors
+
+constants:
+  BASE_SPEED: 4.0
+  # Turn gain: an obstacle reading of 1000 changes a wheel speed by 5 rad/s.
+  GAIN: 0.005
+
+cells:
+  - id: 1
+    contents:
+      - left_obstacle = 0
+      - right_obstacle = 0
+      - left_speed = 0
+      - right_speed = 0
+      - left_position = 0
+      - right_position = 0
+    input: [left_obstacle, right_obstacle]
+    output: [left_speed, right_speed]
+
+rules:
+  # Clear the previous speeds (rules add to their targets).
+  - left_speed * 0 -> left_speed
+  - right_speed * 0 -> right_speed
+  # Turn away from the closer side: an obstacle on the left speeds up the
+  # left wheel and slows down the right one.
+  - BASE_SPEED + GAIN * (left_obstacle - right_obstacle) -> left_speed
+  - BASE_SPEED + GAIN * (right_obstacle - left_obstacle) -> right_speed
+
+webots:
+  timestep: 64
+  bindings:
+    # Virtual devices: no `device`; setup provides them.
+    left_obstacle:
+      read_method: getValue
+    right_obstacle:
+      read_method: getValue
+    # Real devices, written through the method setup adds.
+    left_speed:
+      device: left wheel motor
+      write_method: set_speed
+    right_speed:
+      device: right wheel motor
+      write_method: set_speed
+    # Velocity mode for both wheels: position = inf, written once at start.
+    left_position:
+      device: left wheel motor
+      write_method: setPosition
+    right_position:
+      device: right wheel motor
+      write_method: setPosition
+  init:
+    left_position: inf
+    right_position: inf
+  # One row per step: the obstacle readings the step received and the
+  # model's speeds (before set_speed clamps them).
+  csv:
+    file: e_puck_virtual_sensors.csv
+    variables: [left_obstacle, right_obstacle, left_speed, right_speed]
+    include_step: true
+    include_time: true
+    precision: 3
+  code:
+    module:
+      file: code/devices.py
+    setup: |
+      devices['left_obstacle'] = Combined(robot, ['ps5', 'ps6', 'ps7'], timestep)
+      devices['right_obstacle'] = Combined(robot, ['ps0', 'ps1', 'ps2'], timestep)
+      add_clamped_velocity(devices['left_speed'])
+      add_clamped_velocity(devices['right_speed'])
+    shutdown: |
+      print('e_puck_virtual_sensors: controller stopped')

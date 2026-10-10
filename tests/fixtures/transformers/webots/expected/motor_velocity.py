@@ -13,7 +13,7 @@ class NncSystem:
 
     def step(self):
         """Execute one step of the TENNCell system.
-        
+
         Returns:
             Dictionary with output variable values
         """

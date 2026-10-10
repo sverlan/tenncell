@@ -18,10 +18,10 @@ class NncSystem:
 
     def step(self, inputs):
         """Execute one step of the TENNCell system.
-        
+
         Args:
             inputs: Dictionary with input variable values (required)
-        
+
         Returns:
             Dictionary with output variable values
         """
@@ -83,16 +83,19 @@ def main():
     csv_writer.writerow(['_step', '_time', 'input_x', 'out'])
     step_index = 0
 
-    while robot.step(timestep) != -1:
-        inputs = {
-            'input_x': float(devices['input_x'].getValue()),
-        }
-        nnc.step(inputs)
-        variables = nnc.get_variables()
-        step_index += 1
-        csv_writer.writerow([step_index, format_csv_value(robot.getTime(), 2), format_csv_value(variables['input_x'], 2), format_csv_value(variables['out'], 2)])
-        csv_file.flush()
-        devices['out'].setValue(variables['out'])
+    try:
+        while robot.step(timestep) != -1:
+            inputs = {
+                'input_x': float(devices['input_x'].getValue()),
+            }
+            nnc.step(inputs)
+            variables = nnc.get_variables()
+            step_index += 1
+            csv_writer.writerow([step_index, format_csv_value(robot.getTime(), 2), format_csv_value(inputs['input_x'], 2), format_csv_value(variables['out'], 2)])
+            csv_file.flush()
+            devices['out'].setValue(variables['out'])
+    finally:
+        csv_file.close()
 
 if __name__ == '__main__':
     main()

@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import keyword
+import textwrap
+from pathlib import Path, PurePosixPath, PureWindowsPath
+
 from ...csv_format import validate_csv_delimiter, validate_csv_precision
 from ...inputs.yaml.sections import YamlSectionContext
 from ...inputs.yaml.errors import YamlLocatedError, as_yaml_located_error
-from .webots_config import WebotsBindingConfig, WebotsConfig, WebotsCsvConfig
+from .webots_config import (
+    CODE_POINTS,
+    WebotsBindingConfig,
+    WebotsCodeBlock,
+    WebotsConfig,
+    WebotsCsvConfig,
+)
 
 
 def _field_location(context: YamlSectionContext, *path: object):
@@ -49,6 +59,7 @@ def _normalize_init_value(value: object) -> object:
 def _parse_bindings(
     raw_bindings: dict[str, dict] | None,
     context: YamlSectionContext,
+    warnings: list[str],
 ) -> dict[str, WebotsBindingConfig]:
     bindings: dict[str, WebotsBindingConfig] = {}
     for variable, item in (raw_bindings or {}).items():
@@ -59,10 +70,13 @@ def _parse_bindings(
                 "bindings",
                 variable,
             )
+        # Without a device, webots.code.setup provides devices[variable].
+        # Only a missing key means virtual; `device: null` is an error.
         device = item.get("device")
-        if not isinstance(device, str):
+        if "device" in item and (not isinstance(device, str) or not device):
             raise context.locations.error(
-                f"Webots binding '{variable}' must define a string 'device'",
+                f"Webots binding '{variable}' device must be a non-empty string "
+                "(leave it out for a virtual device provided by webots.code.setup)",
                 "webots",
                 "bindings",
                 variable,
@@ -85,6 +99,34 @@ def _parse_bindings(
                 "bindings",
                 variable,
                 "write_method",
+            )
+        # The controller emits `devices[...].<method>(...)`. A method name is
+        # the normal case; other text (an expression) is pasted unchecked,
+        # with a warning pointing to webots.code. Empty
+        # text or a lone keyword could never work: errors.
+        for key, method in (
+            ("read_method", read_method),
+            ("write_method", write_method),
+        ):
+            if method is None or (
+                method.isidentifier() and not keyword.iskeyword(method)
+            ):
+                continue
+            if not method.strip() or keyword.iskeyword(method.strip()):
+                raise context.locations.error(
+                    f"Webots binding '{variable}' {key} must be a method name, "
+                    f"not {method!r}",
+                    "webots",
+                    "bindings",
+                    variable,
+                    key,
+                )
+            source, line = _field_location(context, "webots", "bindings", variable, key)
+            where = f"{source}:{line}: " if line is not None else ""
+            warnings.append(
+                f"{where}Webots binding '{variable}' {key} is not a method name; "
+                "the text is pasted into the controller unchecked. Prefer a "
+                "method added to the device in webots.code.setup"
             )
         if read_method is None and write_method is None:
             raise context.locations.error(
@@ -200,6 +242,73 @@ def _parse_csv(raw_csv: object, context: YamlSectionContext) -> WebotsCsvConfig 
     )
 
 
+def _parse_code(
+    raw_code: object, context: YamlSectionContext
+) -> dict[str, WebotsCodeBlock]:
+    """Parse ``webots.code``: inline text or ``{file: PATH}`` per point.
+
+    A file path is relative to the YAML file that declares it (an include
+    fragment, possibly); the file is read here, never imported or run.
+    """
+    if raw_code is None:
+        return {}
+    if not isinstance(raw_code, dict):
+        raise context.locations.error(
+            "webots.code must be a mapping if provided", "webots", "code"
+        )
+    code: dict[str, WebotsCodeBlock] = {}
+    for point, value in raw_code.items():
+        path = ("webots", "code", point)
+        if point not in CODE_POINTS:
+            raise context.locations.error(
+                f"unknown webots.code insertion point {point!r}; expected one of "
+                + ", ".join(CODE_POINTS),
+                *path,
+            )
+        if isinstance(value, str):
+            text, source = value, "inline"
+        elif isinstance(value, dict) and set(value) == {"file"}:
+            file_name = value["file"]
+            if not isinstance(file_name, str) or not file_name.strip():
+                raise context.locations.error(
+                    f"webots.code.{point}.file must be a non-empty string",
+                    *path,
+                    "file",
+                )
+            # A drive or root (C:\x.py, /x.py, \\host\share) would discard the
+            # folder of the declaring file: only relative paths are portable.
+            # Both syntaxes are checked, whatever the host system.
+            if PureWindowsPath(file_name).anchor or PurePosixPath(file_name).anchor:
+                raise context.locations.error(
+                    f"webots.code.{point}.file must be relative to the YAML file "
+                    f"that declares it, not {file_name!r}",
+                    *path,
+                    "file",
+                )
+            declared_in = context.locations.source_for_under(*path)
+            file_path = Path(declared_in).parent / file_name
+            try:
+                # utf-8-sig: a BOM would end up inside the controller.
+                text = file_path.read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeDecodeError) as error:
+                raise context.locations.error(
+                    f"webots.code.{point}: cannot read {file_path} ({error})",
+                    *path,
+                    "file",
+                ) from error
+            source = file_name
+        else:
+            raise context.locations.error(
+                f"webots.code.{point} must be a string or a mapping with only 'file'",
+                *path,
+            )
+        # Relative indentation is kept; leading and trailing blank lines go.
+        text = textwrap.dedent(text.replace("\r\n", "\n")).lstrip("\n").rstrip()
+        if text:
+            code[point] = WebotsCodeBlock(text=text, source=source)
+    return code
+
+
 def parse_webots_section(
     section: dict | None, context: YamlSectionContext
 ) -> WebotsConfig:
@@ -245,13 +354,40 @@ def parse_webots_section(
             source_path,
             line,
         )
-    bindings = _parse_bindings(raw_bindings, context)
+    warnings: list[str] = []
+    bindings = _parse_bindings(raw_bindings, context, warnings)
     init = _parse_init(raw_init)
     csv = _parse_csv(data.get("csv"), context)
+    code = _parse_code(data.get("code"), context)
     return WebotsConfig(
         controller_name=controller_name,
         timestep=timestep,
         bindings=bindings,
         init=init,
         csv=csv,
+        code=code,
+        warnings=warnings,
+        where=_where(context, bindings, init),
     )
+
+
+def _where(
+    context: YamlSectionContext,
+    bindings: dict[str, WebotsBindingConfig],
+    init: dict[str, object],
+) -> dict[tuple[str, ...], str]:
+    """``"file:line: "`` of the YAML paths the transformer reports errors on."""
+    paths: list[tuple[str, ...]] = [
+        (),
+        ("bindings",),
+        *(("bindings", variable) for variable in bindings),
+        ("init",),
+        *(("init", variable) for variable in init),
+        ("csv", "variables"),
+    ]
+    where: dict[tuple[str, ...], str] = {}
+    for path in paths:
+        source, line = _field_location(context, "webots", *path)
+        if line is not None:
+            where[path] = f"{source}:{line}: "
+    return where

@@ -1,0 +1,48 @@
+# Webots controller whose bindings call methods that setup code adds to the
+# devices: setup runs right after the devices are created, before enable, the
+# init writes and the loop, so all of them can use the added methods.
+# - read_scaled: the sensor reading scaled by 0.001 (1000 -> 1.0);
+# - park: the init write of position = inf, through setPosition;
+# - set_int: a real Webots LED takes an int (LED.set), the model gives floats.
+module:
+  name: code_patch_controller
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+      - speed = 0
+      - position = 0
+      - led_on = 0
+    input: [distance]
+    output: [speed, led_on]
+rules:
+  - distance -> speed
+  - speed * 0 -> speed
+  - 1 -> led_on
+  - led_on * 0 -> led_on
+webots:
+  timestep: 32
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: read_scaled
+    speed:
+      device: wheel
+      write_method: setVelocity
+    position:
+      device: wheel
+      write_method: park
+    led_on:
+      device: led
+      write_method: set_int
+  init:
+    position: inf
+  csv:
+    file: code_patch.csv
+    variables: [speed, led_on]
+  code:
+    setup: |
+      sensor, wheel, led = devices['distance'], devices['speed'], devices['led_on']
+      sensor.read_scaled = lambda: sensor.getValue() * 0.001
+      wheel.park = lambda value: wheel.setPosition(value)
+      led.set_int = lambda value: led.set(int(value))

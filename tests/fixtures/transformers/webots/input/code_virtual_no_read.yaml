@@ -1,0 +1,17 @@
+# A virtual input binding with only a write method and no setup code: the
+# missing read method is reported, not the missing setup (basic binding
+# errors come first).
+module:
+  name: code_virtual_no_read_controller
+cells:
+  - id: 1
+    contents:
+      - nearest = 0
+    input: [nearest]
+rules:
+  - nearest * 0 -> nearest
+webots:
+  timestep: 32
+  bindings:
+    nearest:
+      write_method: record

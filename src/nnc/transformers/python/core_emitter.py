@@ -87,13 +87,13 @@ class PythonCoreEmitter:
     ):
         """Emit the docstring for the generated `step()` method."""
         self.add_line('"""Execute one step of the TENNCell system.', indent)
-        self.add_line("", indent)
+        self.add_line()  # blank docstring lines carry no indentation
         if input_vars:
             self.add_line("Args:", indent)
             self.add_line(
                 "inputs: Dictionary with input variable values (required)", indent + 1
             )
-            self.add_line("", indent)
+            self.add_line()
         self.add_line("Returns:", indent)
         if output_vars:
             self.add_line("Dictionary with output variable values", indent + 1)

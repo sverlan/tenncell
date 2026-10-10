@@ -1,0 +1,16 @@
+# A virtual device (binding without `device`) and no setup code that could
+# provide it: an error at generation.
+module:
+  name: code_virtual_no_setup_controller
+cells:
+  - id: 1
+    contents:
+      - nearest = 0
+    input: [nearest]
+rules:
+  - nearest * 0 -> nearest
+webots:
+  timestep: 32
+  bindings:
+    nearest:
+      read_method: read

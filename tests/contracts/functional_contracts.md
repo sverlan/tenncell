@@ -26,6 +26,12 @@ functional tests.
 - External module headers and instances are parsed and wired correctly.
 - Imported modules contribute their own Verilog hardware configuration.
 
+## Webots generation
+
+- Generated controllers run in the documented order in a small in-process
+  Webots simulator, and in real Webots when `NNC_WEBOTS` is set
+  (`functional/webots_runtime.md`).
+
 ## CLI
 
 - The transform CLI produces the expected output files for supported targets.

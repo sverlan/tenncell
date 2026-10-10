@@ -1,0 +1,27 @@
+# Webots controller with shutdown code and no CSV log: the loop runs in
+# try/finally, and the finally block (pass, then the shutdown code) runs also
+# after an error.
+module:
+  name: code_shutdown_controller
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+      - speed = 0
+    input: [distance]
+    output: [speed]
+rules:
+  - speed * 0 -> speed
+  - distance -> speed
+webots:
+  timestep: 32
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: getValue
+    speed:
+      device: wheel
+      write_method: setVelocity
+  code:
+    shutdown: |
+      print('stopped')

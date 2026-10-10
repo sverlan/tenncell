@@ -1,0 +1,23 @@
+# A virtual device (binding without `device`) that the setup code forgets to
+# provide: the controller stops right after setup with an error naming it.
+module:
+  name: code_virtual_missing_controller
+cells:
+  - id: 1
+    contents:
+      - nearest = 0
+      - echo = 0
+    input: [nearest]
+    output: [echo]
+rules:
+  - nearest -> echo
+webots:
+  timestep: 32
+  bindings:
+    nearest:
+      read_method: read
+    echo:
+      device: wheel
+      write_method: setVelocity
+  code:
+    setup: "pass"

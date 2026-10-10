@@ -1,0 +1,15 @@
+# An init entry whose binding has no write method: a located error.
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+    input: [distance]
+rules:
+  - distance * 0 -> distance
+webots:
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: getValue
+  init:
+    distance: 1

@@ -1,0 +1,39 @@
+# Webots runtime fixture (real Webots, opt-in test): a distance sensor drives
+# a wheel. speed = distance / 1000 on every step (x * 0 -> x clears the old
+# speed); the motor is put in velocity mode by the one-shot init write of
+# position = inf. In the fixture world, nothing is in front of the sensor, so
+# it reads its maximum, 1000.
+module:
+  name: sensor_motor_controller
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+      - speed = 0
+      - position = 0
+    input: [distance]
+    output: [speed]
+rules:
+  - distance * 0.001 -> speed
+  - speed * 0 -> speed
+webots:
+  controller_name: sensor_motor
+  timestep: 32
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: getValue
+    speed:
+      device: wheel
+      write_method: setVelocity
+    position:
+      device: wheel
+      write_method: setPosition
+  init:
+    position: inf
+  csv:
+    file: sensor_motor.csv
+    variables: [distance, speed]
+    include_step: true
+    include_time: true
+    include_initial: true

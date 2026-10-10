@@ -1,0 +1,19 @@
+# Webots controller of a model without inputs or outputs, with comment-only
+# code at every insertion point: the generated controller must still be valid
+# Python (no empty blocks).
+module:
+  name: code_no_io_controller
+cells:
+  - id: 1
+    contents:
+      - x = 0
+rules:
+  - x + 1 -> x
+webots:
+  timestep: 32
+  code:
+    module: "# module"
+    setup: "# setup"
+    before_step: "# before_step"
+    after_step: "# after_step"
+    shutdown: "# shutdown"

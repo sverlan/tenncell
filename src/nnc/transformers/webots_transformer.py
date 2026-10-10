@@ -65,6 +65,7 @@ class WebotsTransformer(BaseTransformer):
         self.reset()
         config = self._config_for(system)
         self._validate_configuration(system, config)
+        self.warnings = list(config.warnings)
         self._emission_context = WebotsEmissionContext(system=system, config=config)
 
         embedded_python = self._python_transformer.transform(system, include_main=False)
@@ -81,62 +82,88 @@ class WebotsTransformer(BaseTransformer):
         self.add_line()
         self.add_line(f"# Webots controller: {config.controller_name}")
         self.add_line()
+        if self._emit_code("module", 0):
+            self.add_line()
         self._emit_main()
         return self.get_output() + "\n"
 
     def _validate_configuration(self, system: NncSystem, config: WebotsConfig) -> None:
-        """Validate that Webots mappings target existing TENNCell variables."""
+        """Validate that Webots mappings target existing TENNCell variables.
+
+        Errors start with the YAML location (``file:line: ``) of the binding,
+        ``init`` entry or CSV list they concern, when the parser recorded it.
+        """
         known_variables = set(system.variables.keys())
         for variable, binding in config.bindings.items():
+            at = config.at("bindings", variable)
             if variable not in known_variables:
                 raise ValueError(
-                    f"Webots configuration references unknown TENNCell variable '{variable}'"
+                    f"{at}Webots configuration references unknown TENNCell "
+                    f"variable '{variable}'"
                 )
             if binding.read_method is None and binding.write_method is None:
                 raise ValueError(
-                    f"Webots binding '{variable}' must define a read or write method"
+                    f"{at}Webots binding '{variable}' must define a read or write method"
                 )
         for variable in config.init.keys():
+            at = config.at("init", variable)
             if variable not in known_variables:
                 raise ValueError(
-                    f"Webots configuration references unknown TENNCell variable '{variable}'"
+                    f"{at}Webots configuration references unknown TENNCell "
+                    f"variable '{variable}'"
                 )
-            binding = config.bindings.get(variable)
-            if binding is None:
-                raise ValueError(f"Webots init references unknown binding '{variable}'")
-            if binding.write_method is None:
+            init_binding = config.bindings.get(variable)
+            if init_binding is None:
                 raise ValueError(
-                    f"Webots init references '{variable}' without a write method"
+                    f"{at}Webots init references unknown binding '{variable}'"
+                )
+            if init_binding.write_method is None:
+                raise ValueError(
+                    f"{at}Webots init references '{variable}' without a write method"
                 )
         if config.csv is not None:
             for variable in config.csv.variables:
                 if variable not in known_variables:
                     raise ValueError(
-                        "Webots CSV configuration references unknown TENNCell "
-                        f"variable '{variable}'"
+                        f"{config.at('csv', 'variables')}Webots CSV configuration "
+                        f"references unknown TENNCell variable '{variable}'"
                     )
 
         for variable in system.input_variables.keys():
-            binding = config.bindings.get(variable)
-            if binding is None:
+            input_binding = config.bindings.get(variable)
+            if input_binding is None:
                 raise ValueError(
-                    f"Webots configuration is missing an input binding for '{variable}'"
+                    f"{config.at('bindings')}Webots configuration is missing an "
+                    f"input binding for '{variable}'"
                 )
-            if binding.read_method is None:
+            if input_binding.read_method is None:
                 raise ValueError(
-                    f"Webots input binding '{variable}' must define a read method"
+                    f"{config.at('bindings', variable)}Webots input binding "
+                    f"'{variable}' must define a read method"
                 )
 
         for variable in system.output_variables.keys():
-            binding = config.bindings.get(variable)
-            if binding is None:
+            output_binding = config.bindings.get(variable)
+            if output_binding is None:
                 raise ValueError(
-                    f"Webots configuration is missing an output binding for '{variable}'"
+                    f"{config.at('bindings')}Webots configuration is missing an "
+                    f"output binding for '{variable}'"
                 )
-            if binding.write_method is None:
+            if output_binding.write_method is None:
                 raise ValueError(
-                    f"Webots output binding '{variable}' must define a write method"
+                    f"{config.at('bindings', variable)}Webots output binding "
+                    f"'{variable}' must define a write method"
                 )
+
+        # Last, so the more basic binding errors above are reported first.
+        if "setup" not in config.code:
+            for variable, binding in config.bindings.items():
+                if binding.device is None:
+                    raise ValueError(
+                        f"{config.at('bindings', variable)}Webots binding "
+                        f"'{variable}' has no device, so webots.code.setup must "
+                        f"provide devices['{variable}']"
+                    )
 
     def _emit_main(self) -> None:
         assert self._emission_context is not None
@@ -154,11 +181,33 @@ class WebotsTransformer(BaseTransformer):
 
         self.add_line("devices = {", 1)
         for variable, binding in config.bindings.items():
+            if binding.device is None:
+                self.add_line(f"'{variable}': None,  # virtual: set by setup code", 2)
+            else:
+                self.add_line(
+                    f"'{variable}': robot.getDevice({binding.device!r}),",
+                    2,
+                )
+        self.add_line("}", 1)
+        # Right after the devices exist: setup code may add methods to them
+        # that enable, init writes and the loop then call, and provides the
+        # virtual devices.
+        if self._emit_code("setup", 1):
+            self.add_line()
+        virtual = [
+            variable
+            for variable, binding in config.bindings.items()
+            if binding.device is None
+        ]
+        for variable in virtual:
+            self.add_line(f"if devices['{variable}'] is None:", 1)
             self.add_line(
-                f"'{variable}': robot.getDevice({binding.device!r}),",
+                f"raise RuntimeError(\"Webots binding '{variable}' has no device: "
+                f"webots.code.setup must set devices['{variable}']\")",
                 2,
             )
-        self.add_line("}", 1)
+        if virtual:
+            self.add_line()
 
         read_bindings = {
             variable: binding
@@ -205,43 +254,87 @@ class WebotsTransformer(BaseTransformer):
                 self._emit_csv_row(1)
             self.add_line()
 
-        self.add_line("while robot.step(timestep) != -1:", 1)
+        # With a CSV log or shutdown code, the loop runs in try/finally: the
+        # log is closed and the shutdown code runs also after an error
+        # (which is then raised again).
+        cleanup = config.csv is not None or "shutdown" in config.code
+        loop = 2 if cleanup else 1
+        body = loop + 1
+        if cleanup:
+            self.add_line("try:", 1)
+        self.add_line("while robot.step(timestep) != -1:", loop)
         if system.input_variables:
-            self.add_line("inputs = {", 2)
+            self.add_line("inputs = {", body)
             for variable in system.input_variables.keys():
                 binding = config.bindings[variable]
                 assert binding.read_method is not None
                 self.add_line(
                     f"'{variable}': float(devices['{variable}'].{binding.read_method}()),",
-                    3,
+                    body + 1,
                 )
-            self.add_line("}", 2)
-            self.add_line("nnc.step(inputs)", 2)
+            self.add_line("}", body)
+            self._emit_code("before_step", body)
+            self.add_line("nnc.step(inputs)", body)
         else:
-            self.add_line("nnc.step()", 2)
-        self.add_line("variables = nnc.get_variables()", 2)
+            self._emit_code("before_step", body)
+            self.add_line("nnc.step()", body)
+        self.add_line("variables = nnc.get_variables()", body)
         if config.csv is not None:
-            self.add_line("step_index += 1", 2)
-            self._emit_csv_row(2)
+            self.add_line("step_index += 1", body)
+            self._emit_csv_row(body, after_step=True)
+        self._emit_code("after_step", body)
         if system.output_variables:
             for variable in system.output_variables.keys():
                 binding = config.bindings[variable]
                 assert binding.write_method is not None
                 self.add_line(
                     f"devices['{variable}'].{binding.write_method}(variables['{variable}'])",
-                    2,
+                    body,
                 )
-        else:
-            self.add_line("pass", 2)
+        elif "after_step" not in config.code:
+            self.add_line("pass", body)
+        if cleanup:
+            self.add_line("finally:", 1)
+            if config.csv is not None:
+                self.add_line("csv_file.close()", 2)
+            else:
+                # The shutdown code may be only comments (it is not parsed).
+                self.add_line("pass", 2)
+            self._emit_code("shutdown", 2)
         self.add_line()
         self.add_line("if __name__ == '__main__':")
         self.add_line("main()", 1)
 
-    def _emit_csv_row(self, indent: int) -> None:
-        """Emit one CSV row write for the current Webots variable snapshot."""
+    def _emit_code(self, point: str, indent: int) -> bool:
+        """Paste the user code of ``point`` between marker comments; return
+        whether there was any."""
+        assert self._emission_context is not None
+        block = self._emission_context.config.code.get(point)
+        if block is None:
+            return False
+        self.add_line(f"# webots code: {point} ({block.source})", indent)
+        for line in block.text.splitlines():
+            # Blank lines stay empty (no trailing indentation).
+            self.add_line(line, indent if line.strip() else 0)
+        self.add_line(f"# end webots code: {point}", indent)
+        return True
+
+    def _emit_csv_row(self, indent: int, after_step: bool = False) -> None:
+        """Emit one CSV row write for the current Webots variable snapshot.
+
+        After a step, input variables log the value the step received
+        (``inputs``), as ``nnc-verify --inputs`` rows do: the post-step value
+        of an input that a rule consumed is 0.
+        """
         assert self._emission_context is not None
         csv_config = self._emission_context.config.csv
         assert csv_config is not None
+        received = (
+            set(self._emission_context.system.input_variables) if after_step else set()
+        )
+
+        def source(variable: str) -> str:
+            return "inputs" if variable in received else "variables"
 
         row_items = [
             *(["step_index"] if csv_config.include_step else []),
@@ -251,7 +344,7 @@ class WebotsTransformer(BaseTransformer):
                 else []
             ),
             *[
-                f"format_csv_value(variables[{variable!r}], {csv_config.precision!r})"
+                f"format_csv_value({source(variable)}[{variable!r}], {csv_config.precision!r})"
                 for variable in csv_config.variables
             ],
         ]

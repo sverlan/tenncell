@@ -114,12 +114,16 @@ The generated file is a Python module. It exposes the TENNCell model as normal P
 The Webots YAML adds sensor and actuator metadata through `webots.bindings` and `webots.init`.
 `webots.bindings` maps TENNCell variables to Webots devices and names the read or write method the controller should call.
 `webots.init` sets initial device state for outputs or actuators that need a startup value.
+`webots.code` pastes your own Python into the controller at fixed points (`module`, `setup`, `before_step`, `after_step`, `shutdown`), inline or from a file, for unit conversion, extra devices or logging; a binding without `device` is a virtual device that your `setup` code provides (for example several sensors combined into one value).
 Use this backend when you want TENNCell to drive a Webots robot or read its sensors.
 
-Example:
+Examples:
 ```powershell
 nnc-gen examples/webots/e_puck_pid/e_puck_pid.yaml -t webots
+nnc-gen examples/webots/e_puck_virtual_sensors/e_puck_virtual_sensors.yaml -t webots
 ```
+
+The second one reads each side of the e-puck as one virtual device combining three proximity sensors. [`docs/webots_tutorial.md`](docs/webots_tutorial.md) walks through plain bindings, pasted code and virtual devices.
 
 ### SVA verification backend
 `nnc-gen -t sva` checks generic `verification.properties` against the RTL that `-t verilog` generates. In simulation mode it writes the RTL closure, a checker module `<stem>_sva.sv`, and a testbench `<stem>_tb.sv` that drives the RTL with your input records (or runs N steps of a model without inputs) and prints one `SVA_RESULT` line per property, with the same statuses and rows as `nnc-verify`:
@@ -403,6 +407,13 @@ pdm run typecheck
 pdm test
 ```
 
+Some functional tests run external tools (Icarus Verilog, Verilator, Yosys/slang, SymbiYosys, Webots, MC2) and are skipped unless an environment variable points to the tool. Put your paths in a `.env` file at the repository root (git-ignored): copy `.env.example`, which lists every variable, and edit it. `pdm test`, the other pdm scripts and `pdm run ...` load `.env` automatically (variables already set in the shell win). To run `pytest` without pdm, load it into your shell first:
+
+```powershell
+. .\scripts\load-env.ps1       # PowerShell (dot-sourced; -Force overrides set variables)
+scripts\load-env.cmd           # cmd
+```
+
 For CI or reproducible installs from the lockfile, use:
 
 ```powershell
@@ -422,7 +433,23 @@ The `webots` backend emits a single Python controller file:
 
 Each declared TENNCell input must have a binding with `read_method`.
 Each declared TENNCell output must have a binding with `write_method`.
+Methods should be plain method names (an expression is still pasted, with a warning); a binding without `device` is a virtual device provided by `webots.code.setup`.
 The rules use TENNCell variable names; the bindings control which Webots methods read or write those variables.
+
+`webots.code` adds user code at fixed points of the controller, as a YAML block or `{file: PATH}` (relative to the YAML file):
+
+```yaml
+webots:
+  code:
+    module:
+      file: code/devices.py        # imports, helpers, classes
+    setup: |
+      devices['left_obstacle'] = Combined(robot, ['ps5', 'ps6', 'ps7'], timestep)
+    before_step: |
+      inputs['distance'] = inputs['distance'] / 1000.0
+```
+
+See [`docs/webots_tutorial.md`](docs/webots_tutorial.md) for the names the code can use and the order in which it runs.
 
 Initialization entries under `webots.init` must refer to bindings with `write_method`.
 CSV entries under `webots.csv.variables` may refer to any TENNCell variable, not only inputs or outputs.
@@ -629,7 +656,7 @@ See `examples/` for:
 - imported multicell Python composition in `examples/composition/imported_composition/`
 - Verilog composition examples in `examples/composition/verilog_composed/`
 - FPGA-oriented examples under `examples/fpga/`, including standalone `blink.yaml`, `blink_if.yaml`, and `ledwalk.yaml`, plus dedicated folders for `blink_uart/`, `blink_uart_typed/`, `sensor_controller/`, `fpga_uart_led/`, `fpga_spi_gpio_bridge/`, and `axii/`
-- Webots controller examples under `examples/webots/`, including `e_puck_pid/` and `pioneer3_dx_obstacle_avoidance/`
+- Webots controller examples under `examples/webots/`, including `e_puck_pid/`, `pioneer3_dx_obstacle_avoidance/` and `e_puck_virtual_sensors/` (virtual devices and pasted code; tutorial in `docs/webots_tutorial.md`)
 - verification examples under `examples/verification/`, including `fsm_counter_mc2.yaml` for `nnc-verify` and `nnc-gen -t mc2`
 
 ## Notes

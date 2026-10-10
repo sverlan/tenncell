@@ -1,0 +1,4 @@
+webots:
+  code:
+    setup:
+      file: setup.py

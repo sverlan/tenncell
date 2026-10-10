@@ -1,0 +1,40 @@
+# Webots controller with user code at every insertion point, inline and from
+# files (paths relative to this file). The code marks where it runs by
+# printing lines (the test simulator records them in order), and before_step
+# rescales the sensor reading, so speed (= the input of the step) shows the
+# model receives the modified input.
+module:
+  name: code_points_controller
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+      - speed = 0
+    input: [distance]
+    output: [speed]
+rules:
+  - distance -> speed
+  - speed * 0 -> speed
+webots:
+  timestep: 32
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: getValue
+    speed:
+      device: wheel
+      write_method: setVelocity
+  csv:
+    file: code_points.csv
+    variables: [speed]
+  code:
+    module:
+      file: code/module.py
+    setup: |
+      mark("setup", timestep)
+    before_step: |
+      mark("before_step", inputs["distance"])
+      inputs["distance"] = scaled(inputs["distance"])
+    after_step:
+      file: code/after_step.py
+    shutdown: "mark('shutdown')"

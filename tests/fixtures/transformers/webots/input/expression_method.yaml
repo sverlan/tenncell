@@ -1,0 +1,24 @@
+# A binding whose read_method is an expression, not a method name:
+# it is pasted after `devices['distance'].` unchecked, with a warning; the
+# code calls the lambda, which scales the reading by 0.001.
+module:
+  name: expression_method_controller
+cells:
+  - id: 1
+    contents:
+      - distance = 0
+      - speed = 0
+    input: [distance]
+    output: [speed]
+rules:
+  - speed * 0 -> speed
+  - distance -> speed
+webots:
+  timestep: 32
+  bindings:
+    distance:
+      device: distance_sensor
+      read_method: "getValue and (lambda: devices['distance'].getValue() * 0.001)"
+    speed:
+      device: wheel
+      write_method: setVelocity

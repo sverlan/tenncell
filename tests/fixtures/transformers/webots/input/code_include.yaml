@@ -1,0 +1,19 @@
+# Webots user code declared in an include fragment: its file path is relative
+# to the fragment (fragments/), not to this file.
+module:
+  name: code_include_controller
+  include: fragments/webots_code.yaml
+cells:
+  - id: 1
+    contents:
+      - speed = 0
+    output: [speed]
+rules:
+  - 1 -> speed
+  - speed * 0 -> speed
+webots:
+  timestep: 32
+  bindings:
+    speed:
+      device: wheel
+      write_method: setVelocity

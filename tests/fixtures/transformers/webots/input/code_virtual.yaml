@@ -1,0 +1,49 @@
+# Webots controller with virtual devices: bindings without `device`, which
+# setup code provides as plain Python objects. The input `nearest` is read
+# from a real sensor through such an object (scaled by 0.001); the output
+# `echo` is written to a text file by another one. The controller calls
+# neither getDevice nor enable for them. The init write of echo = -1 goes
+# through the recorder too: setup runs before the init writes.
+module:
+  name: code_virtual_controller
+cells:
+  - id: 1
+    contents:
+      - nearest = 0
+      - echo = 0
+    input: [nearest]
+    output: [echo]
+rules:
+  - nearest -> echo
+  - echo * 0 -> echo
+webots:
+  timestep: 32
+  bindings:
+    nearest:
+      read_method: read
+    echo:
+      write_method: record
+  init:
+    echo: -1
+  code:
+    module: |
+      class Nearest:
+          def __init__(self, sensor):
+              self.sensor = sensor
+
+          def read(self):
+              return self.sensor.getValue() * 0.001
+
+
+      class Recorder:
+          def __init__(self, path):
+              self.file = open(path, "w")
+
+          def record(self, value):
+              self.file.write(f"{value}\n")
+              self.file.flush()
+    setup: |
+      sensor = robot.getDevice("distance_sensor")
+      sensor.enable(timestep)
+      devices["nearest"] = Nearest(sensor)
+      devices["echo"] = Recorder("echo.txt")

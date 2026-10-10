@@ -1,0 +1,35 @@
+#VRML_SIM R2025a utf8
+
+# Webots runtime fixture: the robot runs the generated controller
+# `sensor_motor` (written into controllers/sensor_motor/ by the test), and a
+# supervisor ends the simulation after a few steps.
+WorldInfo {
+  basicTimeStep 32
+}
+Robot {
+  name "dut"
+  children [
+    DistanceSensor {
+      name "distance_sensor"
+    }
+    LED {
+      name "led"
+    }
+    HingeJoint {
+      device [
+        RotationalMotor {
+          name "wheel"
+          maxVelocity 10
+        }
+      ]
+      endPoint Solid {
+      }
+    }
+  ]
+  controller "sensor_motor"
+}
+Robot {
+  name "quitter"
+  supervisor TRUE
+  controller "quitter"
+}

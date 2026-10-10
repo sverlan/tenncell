@@ -8,10 +8,10 @@ class NncSystem:
 
     def step(self, inputs):
         """Execute one step of the TENNCell system.
-        
+
         Args:
             inputs: Dictionary with input variable values (required)
-        
+
         Returns:
             Dictionary with output variable values
         """

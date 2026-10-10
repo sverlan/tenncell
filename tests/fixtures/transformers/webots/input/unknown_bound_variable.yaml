@@ -1,0 +1,16 @@
+# A binding for a variable the model does not have: a located error.
+cells:
+  - id: 1
+    contents:
+      - speed = 0
+    output: [speed]
+rules:
+  - 1 -> speed
+webots:
+  bindings:
+    speed:
+      device: wheel
+      write_method: setVelocity
+    spead:
+      device: wheel
+      write_method: setVelocity
