@@ -152,9 +152,9 @@ def build_observation(emitter, ctx: VerilogEmissionContext) -> VerilogObservatio
         )
 
     for item in system.imports:
-        imported_ports = emitter._port_map_for(item.system)
-        frac_bits = emitter._config_for(item.system).real_encoding.frac_bits
-        for output_name in item.system.output_variables:
+        imported_ports = emitter._port_map_for(item.resolved_system)
+        frac_bits = emitter._config_for(item.resolved_system).real_encoding.frac_bits
+        for output_name in item.resolved_system.output_variables:
             port = imported_ports.get(output_name)
             if port is None:
                 continue
@@ -168,7 +168,7 @@ def build_observation(emitter, ctx: VerilogEmissionContext) -> VerilogObservatio
     # Imported inputs last: their connection may name any signal above.
     by_expression = {signal.expression: signal for signal in signals.values()}
     for item in system.imports:
-        imported = item.system
+        imported = item.resolved_system
         imported_ports = emitter._port_map_for(imported)
         frac_bits = emitter._config_for(imported).real_encoding.frac_bits
         for input_name in imported.input_variables:

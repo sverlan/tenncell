@@ -80,6 +80,8 @@
 - External instances do not become part of the top-level module interface.
 - `NncSystem.from_yaml()` does not parse the `verilog` section. Verilog section parsing is performed by the Verilog transform path and passed to the Verilog backend as backend configuration.
 - External headers and inline schemas use a top-level `schema` section when describing reusable external module definitions.
+- An error about a missing field in the `verilog` section names the YAML line of the nearest enclosing entry that exists (for example the `types` entry, the external's alias entry or its inline `schema`), not the start of the section.
+- An output name bound by two imported modules is an error naming the variable (`Verilog variable 'y' is bound more than once by imported outputs`).
 
 ### Verilog Internal Typing
 - `verilog.types` is optional and applies only to TENNCell variables that are not already type-determined by a boundary binding.

@@ -339,6 +339,16 @@ class TestVerilogTransformer:
             [str(INPUT_ROOT / "external_output_connection")],
         )
 
+    def test_inline_schema_external_with_fixed_point_output_feeds_an_input(self):
+        # The external module is described inline (`schema`, no header file);
+        # its fixed-point output port (12 bits) drives the root input u and is
+        # converted to the module encoding where a rule reads it.
+        assert_matches_fixture(
+            INPUT_ROOT / "inline_schema_external" / "root.yaml",
+            EXPECTED_ROOT / "inline_schema_external" / "root.sv",
+            [str(INPUT_ROOT / "inline_schema_external")],
+        )
+
     def test_external_output_connection_to_local_variable_is_emitted(self):
         assert_matches_fixture(
             INPUT_ROOT / "external_output_wire" / "root.yaml",

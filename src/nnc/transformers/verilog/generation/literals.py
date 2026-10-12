@@ -7,20 +7,18 @@ from typing import TYPE_CHECKING
 from ..hardware_config import VerilogEncoding
 
 if TYPE_CHECKING:
-    from .conversions import VerilogConversionEmitter
+    from .host import VerilogEmitterHost
     from .context import VerilogEmissionContext
 
 
-def fixed_storage_decl(
-    emitter: VerilogConversionEmitter, width: int, signed: bool
-) -> str:
+def fixed_storage_decl(emitter: VerilogEmitterHost, width: int, signed: bool) -> str:
     """Return the Verilog storage declaration for a fixed-point signal."""
     sign = " signed" if signed else ""
     return f"logic{sign} [{width - 1}:0]"
 
 
 def encode_float(
-    emitter: VerilogConversionEmitter,
+    emitter: VerilogEmitterHost,
     value: float,
     width: int,
     frac_bits: int,
@@ -43,7 +41,7 @@ def signed_literal(width: int, value: int) -> str:
 
 
 def literal_param_name(
-    emitter: VerilogConversionEmitter,
+    emitter: VerilogEmitterHost,
     value: float,
     width: int,
     frac_bits: int,
@@ -75,14 +73,14 @@ def literal_param_name(
 
 
 def fixed_literal_encoding_suffix(
-    emitter: VerilogConversionEmitter, width: int, frac_bits: int
+    emitter: VerilogEmitterHost, width: int, frac_bits: int
 ) -> str:
     """Return the suffix used for non-default fixed-point literal names."""
     return f"Q{width - frac_bits}_{frac_bits}"
 
 
 def integer_literal_ref(
-    emitter: VerilogConversionEmitter, value: float, width: int, signed: bool
+    emitter: VerilogEmitterHost, value: float, width: int, signed: bool
 ) -> str:
     """Return a sized integer literal for a packed Verilog target."""
     integer_value = int(round(value))
@@ -92,7 +90,7 @@ def integer_literal_ref(
     return f"{width}'d{masked}"
 
 
-def sanitize_literal_value(emitter: VerilogConversionEmitter, value: float) -> str:
+def sanitize_literal_value(emitter: VerilogEmitterHost, value: float) -> str:
     """Convert a numeric literal into a Verilog-safe identifier fragment."""
     text = str(value)
     text = text.replace("-", "NEG_")
@@ -101,7 +99,7 @@ def sanitize_literal_value(emitter: VerilogConversionEmitter, value: float) -> s
 
 
 def fixed_literal_ref(
-    emitter: VerilogConversionEmitter,
+    emitter: VerilogEmitterHost,
     value: float,
     width: int,
     frac_bits: int,
@@ -113,7 +111,7 @@ def fixed_literal_ref(
 
 
 def emit_literal_params(
-    emitter: VerilogConversionEmitter, ctx: VerilogEmissionContext | None = None
+    emitter: VerilogEmitterHost, ctx: VerilogEmissionContext | None = None
 ) -> str:
     """Emit the generated fixed-point literal parameter block."""
     ctx = ctx or emitter._emission_context
@@ -136,7 +134,7 @@ def emit_literal_params(
 
 
 def emit_constant_in_encoding(
-    emitter: VerilogConversionEmitter,
+    emitter: VerilogEmitterHost,
     value: float,
     target_encoding: VerilogEncoding,
     ctx: VerilogEmissionContext,
@@ -159,7 +157,7 @@ def emit_constant_in_encoding(
 
 
 def emit_constant_expression(
-    emitter: VerilogConversionEmitter, value: float, ctx: VerilogEmissionContext
+    emitter: VerilogEmitterHost, value: float, ctx: VerilogEmissionContext
 ) -> str:
     """Emit one fixed-point constant expression using the module encoding."""
     enc = ctx.config.real_encoding

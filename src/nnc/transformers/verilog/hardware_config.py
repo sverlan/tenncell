@@ -203,6 +203,12 @@ class VerilogHardwareConfig:
     type_lines: dict[str, int | None] = field(default_factory=dict)
     externals: list[ExternalInstance] = field(default_factory=list)
 
+    def require_real_encoding(self) -> RealEncoding:
+        """Return ``real_encoding``, which the Verilog export requires."""
+        if self.real_encoding is None:
+            raise ValueError("Verilog export requires a verilog.real_encoding section")
+        return self.real_encoding
+
     @property
     def top_ports(self) -> list[PortConfig]:
         """Return top-level ports for compatibility with the old contract."""

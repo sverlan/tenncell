@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ....parser.ast import *
 from ....parser.ast.expression import FunctionCallExpression
 from ....model.system import NncSystem
@@ -10,7 +12,13 @@ from .context import VerilogEmissionContext
 from .literals import emit_constant_expression, emit_constant_in_encoding
 
 
-class VerilogExpressionEmitter:
+if TYPE_CHECKING:
+    from .host import VerilogEmitterHost as _Host
+else:
+    _Host = object
+
+
+class VerilogExpressionEmitter(_Host):
     """Validate and emit Verilog expressions from TENNCell AST nodes."""
 
     def _validate_supported_system(self, system: NncSystem):

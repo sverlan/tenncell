@@ -1,9 +1,16 @@
 """CSV command-line script emission for generated Python TENNCell systems."""
 
+from typing import TYPE_CHECKING
+
 from ...model.system import NncSystem
 
+if TYPE_CHECKING:
+    from .host import PythonEmitterHost as _Host
+else:
+    _Host = object
 
-class PythonCsvScriptEmitter:
+
+class PythonCsvScriptEmitter(_Host):
     """Emit the CSV executable wrapper around generated Python TENNCell systems."""
 
     def _emit_format_float_function(self):

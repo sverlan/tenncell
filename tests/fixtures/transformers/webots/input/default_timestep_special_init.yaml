@@ -1,0 +1,25 @@
+# Webots controller with no timestep (read from the robot), no outputs and no
+# code: the loop body is just the model step. Two wheel positions are
+# initialized to -inf and nan, which the controller writes as float('-inf')
+# and float('nan').
+module:
+  name: default_timestep_controller
+cells:
+  - id: 1
+    contents:
+      - tick = 0
+      - left_position = 0
+      - right_position = 0
+rules:
+  - tick + 1 -> tick
+webots:
+  bindings:
+    left_position:
+      device: left wheel
+      write_method: setPosition
+    right_position:
+      device: right wheel
+      write_method: setPosition
+  init:
+    left_position: -inf
+    right_position: nan

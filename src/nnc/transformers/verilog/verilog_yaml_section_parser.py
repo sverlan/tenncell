@@ -1,7 +1,7 @@
 """Parser for the Verilog-specific YAML section."""
 
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, cast
 
 from ...inputs.yaml.resolution import resolve_path
 from ...inputs.yaml.errors import YamlLocatedError, as_yaml_located_error
@@ -32,29 +32,30 @@ def _require_mapping(raw: dict | None, section_name: str) -> dict:
 
 
 def _field_line(locations: YamlLocationIndex | None, *path: object) -> int | None:
-    """Look up the most specific available line for a YAML field."""
+    """Look up the most specific available line for a YAML field.
+
+    A field that is missing has no line of its own: the line of the nearest
+    enclosing entry that exists is used (for a missing ``kind`` of a type
+    entry, the entry itself).
+    """
     if locations is None:
         return None
-    line = locations.line_for(*path)
-    if line is not None:
-        return line
-    line = locations.first_line_under(*path)
-    if line is not None:
-        return line
-    return locations.line_for(*path[:1])
+    for end in range(len(path), 0, -1):
+        line = locations.line_for(*path[:end])
+        if line is None:
+            line = locations.first_line_under(*path[:end])
+        if line is not None:
+            return line
+    return None
 
 
 def _field_source(locations: YamlLocationIndex | None, *path: object) -> Path | None:
     """Look up the most specific available source file for a YAML field."""
     if locations is None:
         return None
-    location = locations.location_for(*path) or locations.location_under(*path)
-    if location is not None:
-        return location.source_path
-    if path:
-        location = locations.location_for(*path[:1]) or locations.location_under(
-            *path[:1]
-        )
+    for end in range(len(path), 0, -1):
+        prefix = path[:end]
+        location = locations.location_for(*prefix) or locations.location_under(*prefix)
         if location is not None:
             return location.source_path
     return locations.source_path
@@ -243,7 +244,7 @@ def parse_external_schema(
             *path,
             "module",
         )
-    module_name = data.get("module", data.get("name"))
+    module_name = data["module"] if "module" in data else data["name"]
     source_path = str(file_path) if file_path is not None else None
     return ExternalModuleSchema(
         module=module_name,
@@ -357,7 +358,9 @@ def parse_verilog_section(
                             ),
                         )
                     )
-            definition = context.header_cache[resolved_header]
+            definition = cast(
+                ExternalModuleSchema, context.header_cache[resolved_header]
+            )
             header_value: str | None = str(resolved_header)
             schema_value: dict | None = None
         elif schema_data is not None:

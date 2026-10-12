@@ -1,3 +1,5 @@
+from typing import Any
+
 from lark import Lark, Transformer, GrammarError, Tree
 from lark.exceptions import VisitError
 
@@ -83,11 +85,22 @@ _variable_assignment_parser = Lark(
 )
 
 
-def _transform_tree(transformer: Transformer, tree: Tree):
+def _transform_tree(transformer: Transformer, tree: Tree, expected: type) -> Any:
+    """Transform a parse tree into its AST result, which must be an ``expected``.
+
+    lark returns the tree itself for a grammar rule without a transformer
+    callback; that, like any other unexpected result, is a grammar bug and
+    never a valid result.
+    """
     try:
-        return transformer.transform(tree)
+        result = transformer.transform(tree)
     except VisitError as error:
         raise error.orig_exc from None
+    if not isinstance(result, expected):
+        raise ValueError(
+            f"parsing produced {type(result).__name__}, expected {expected.__name__}"
+        )
+    return result
 
 
 # Create a custom transformer to build the expression tree
@@ -253,7 +266,7 @@ def parse_expression(
     context_variables: dict[str, Variable],
     constants: dict[str, FloatValue] | None = None,
     aliases: dict[str, Expression] | None = None,
-) -> Expression | Tree:
+) -> Expression:
     """Parse a TENNCell arithmetic expression into the AST used by the model.
 
     Args:
@@ -271,7 +284,7 @@ def parse_expression(
     """
     tree = _expression_parser.parse(expression_string)
     return _transform_tree(
-        ExpressionTransformer(context_variables, constants, aliases), tree
+        ExpressionTransformer(context_variables, constants, aliases), tree, Expression
     )
 
 
@@ -281,7 +294,7 @@ def parse_condition(
     context_variables: dict[str, Variable],
     constants: dict[str, FloatValue] | None = None,
     aliases: dict[str, Expression] | None = None,
-) -> BooleanExpression | Tree:
+) -> BooleanExpression:
     """Parse a TENNCell boolean condition into the AST used by rules and guards.
 
     Args:
@@ -299,7 +312,9 @@ def parse_condition(
     """
     tree = _condition_parser.parse(condition_string)
     return _transform_tree(
-        ConditionTransformer(context_variables, constants, aliases), tree
+        ConditionTransformer(context_variables, constants, aliases),
+        tree,
+        BooleanExpression,
     )
 
 
@@ -309,7 +324,7 @@ def parse_rule(
     context_variables: dict[str, Variable],
     constants: dict[str, FloatValue] | None = None,
     aliases: dict[str, Expression] | None = None,
-) -> Rule | Tree:
+) -> Rule:
     """Parse a TENNCell rule string into a lowered :class:`Rule` object.
 
     Args:
@@ -326,7 +341,9 @@ def parse_rule(
             variable.
     """
     tree = _rule_parser.parse(rule_string)
-    return _transform_tree(RuleTransformer(context_variables, constants, aliases), tree)
+    return _transform_tree(
+        RuleTransformer(context_variables, constants, aliases), tree, Rule
+    )
 
 
 # Parse the rule and build the expression tree
@@ -335,7 +352,7 @@ def parse_variable_assignment(
     context_variables: dict[str, Variable],
     constants: dict[str, FloatValue] | None = None,
     aliases: dict[str, Expression] | None = None,
-) -> dict[str, Variable] | Tree:
+) -> dict[str, Variable]:
     """Parse one or more variable assignments into the model variable map.
 
     Args:
@@ -353,5 +370,5 @@ def parse_variable_assignment(
     """
     tree = _variable_assignment_parser.parse(assignment_string)
     return _transform_tree(
-        AssignmentTransformer(context_variables, constants, aliases), tree
+        AssignmentTransformer(context_variables, constants, aliases), tree, dict
     )

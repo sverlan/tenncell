@@ -1,15 +1,23 @@
 """Reusable Python TENNCell core code emission helpers."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ...inputs.yaml.module_config import connection_number
 from ...model.system import NncSystem
 from .emission_context import PythonEmissionContext
 from .expression_emitter import UnsupportedFunctionError
 
+if TYPE_CHECKING:
+    from .host import PythonEmitterHost as _Host
+else:
+    _Host = object
 
-class PythonCoreEmitter:
+
+class PythonCoreEmitter(_Host):
     """Emit Python TENNCell system classes, modules, and step methods."""
+
+    _current_system: NncSystem | None = None
 
     def _zero_reset_mode(self, system: NncSystem) -> bool:
         """Return whether the TENNCell system should use zero-reset semantics."""

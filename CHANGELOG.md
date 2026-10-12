@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2
+
+- `pdm run typecheck` now checks the whole package (`mypy src/nnc`, 96 files), including the bodies of functions without annotations. It covered about a third before, so the Verilog and Python generators, the YAML loader and the lowering code were unchecked. The emitter mixins declare what they use from each other in one type-only class per backend (`host.py`, no runtime effect), and the errors this uncovered were fixed: reused loop variables, optional values used without narrowing (`ImportConfig.resolved_system`, `VerilogHardwareConfig.require_real_encoding()`), external-module bindings typed as strings, and parser results typed `| Tree` (the parsers now check that they return the AST type they declare; a raw lark tree can only come from a grammar rule without a transformer). Coverage no longer counts `if TYPE_CHECKING:` blocks and the type-only `host.py` modules.
+- Verilog: an error about a missing field in the `verilog` section (a `types` entry without `kind` or `width`, an inline external `schema` without a module name) now names the line of that entry instead of the first line of the `verilog` section, and the error for an output bound by two imports no longer calls the variable an input. About 100 lines of unreachable code were removed from the generator (an input-source helper and duplicate validations), and the inline `schema` form of `verilog.externals`, its fixed-point outputs and the configuration errors are now covered by tests.
+- Updated the locked PyYAML dependency from 6.0.2 to 6.0.3, which provides prebuilt CPython 3.14 wheels and avoids requiring Microsoft C++ Build Tools when creating a Python 3.14 environment.
+
 ## 0.10.1
 
 - Webots controllers with a CSV log or `shutdown` code run their loop in `try`/`finally`: the log is closed and the `shutdown` code runs also after an error. `webots.code` file paths must be relative (an absolute path silently discarded the YAML file's folder). Transformer errors about bindings, `init` and the CSV list now name their YAML line. The Webots modules are type-checked (`pdm run typecheck`). Generated Python `step()` docstrings no longer have whitespace-only lines.

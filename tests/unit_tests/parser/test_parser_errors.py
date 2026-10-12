@@ -42,3 +42,29 @@ class TestParserErrors:
             GrammarError, match="Variable x used in assignment is not defined"
         ):
             transformer.assignment(["y", FakeExpression()])
+
+
+def test_a_grammar_rule_without_transformer_callback_is_an_error():
+    # lark hands back the tree itself for such a rule; the parser must not
+    # return it as if it were an AST node.
+    from lark import Transformer, Tree
+
+    from nnc.parser.ast import Expression
+    from nnc.parser.parser import _transform_tree
+
+    with pytest.raises(ValueError, match="parsing produced Tree, expected Expression"):
+        _transform_tree(Transformer(), Tree("orphan", []), Expression)
+
+
+def test_a_result_of_the_wrong_kind_is_an_error():
+    from lark import Transformer, Tree
+
+    from nnc.parser.ast import Expression
+    from nnc.parser.parser import _transform_tree
+
+    class Wrong(Transformer):
+        def orphan(self, children):
+            return 42
+
+    with pytest.raises(ValueError, match="parsing produced int, expected Expression"):
+        _transform_tree(Wrong(), Tree("orphan", []), Expression)

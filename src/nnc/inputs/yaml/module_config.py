@@ -81,6 +81,14 @@ class ImportConfig:
     connections: dict[str, str] = field(default_factory=dict)
     system: NncSystem | None = None
 
+    @property
+    def resolved_system(self) -> NncSystem:
+        """The loaded child system (``system`` is ``None`` only while the
+        loader has not resolved the import)."""
+        if self.system is None:
+            raise ValueError(f"Import '{self.alias}' is not resolved")
+        return self.system
+
 
 @dataclass(slots=True)
 class ModuleConfig:

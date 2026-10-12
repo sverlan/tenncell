@@ -11,9 +11,12 @@ from .references import boundary_wire_name
 
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
+    from .host import VerilogEmitterHost as _Host
+else:
+    _Host = object
 
 
-class VerilogStructuralEmitter:
+class VerilogStructuralEmitter(_Host):
     """Emit Verilog ports, wires, submodules, externals, and outputs."""
 
     def _port_map_for(self, system: NncSystem) -> dict[str, PortConfig]:
@@ -89,20 +92,20 @@ class VerilogStructuralEmitter:
                         )
                     external_input_bindings[target_ref] = (item, port)
 
-        for item in system.imports:
-            imported = item.system
+        for child in system.imports:
+            imported = child.resolved_system
             imported_ports = self._port_map_for(imported)
             for output_name in imported.output_variables.keys():
                 if output_name not in system.variables:
                     continue
                 if output_name in import_output_bindings:
                     raise ValueError(
-                        f"Verilog input variable '{output_name}' is bound more than once by imported outputs"
+                        f"Verilog variable '{output_name}' is bound more than once by imported outputs"
                     )
                 imported_port = imported_ports.get(output_name)
                 if imported_port is None:
                     continue
-                import_output_bindings[output_name] = (item.alias, imported_port)
+                import_output_bindings[output_name] = (child.alias, imported_port)
 
         return (
             top_ports,
@@ -145,22 +148,6 @@ class VerilogStructuralEmitter:
                 raise ValueError(
                     f"Output variable '{name}' must be bound to an output port"
                 )
-        for name in ctx.external_output_bindings:
-            if name not in system.variables:
-                raise ValueError(
-                    f"External output binding '{name}' must target a TENNCell variable"
-                )
-        for name in ctx.import_output_bindings:
-            if name not in system.variables:
-                raise ValueError(
-                    f"Imported output binding '{name}' must target a TENNCell variable"
-                )
-        for name in ctx.external_input_bindings:
-            if name not in system.variables:
-                raise ValueError(
-                    f"External input binding '{name}' must target a TENNCell variable"
-                )
-
         for name in ctx.top_ports:
             if name not in input_names and name not in output_names:
                 raise ValueError(
@@ -207,11 +194,11 @@ class VerilogStructuralEmitter:
         """Emit wires used to connect imported TENNCell modules."""
         ctx = ctx or self._emission_context
         assert ctx is not None
-        for item in ctx.system.imports:
-            imported = item.system
+        for child in ctx.system.imports:
+            imported = child.resolved_system
             port_map = self._port_map_for(imported)
             for output_name in imported.output_variables.keys():
-                wire_name = boundary_wire_name(item.alias, output_name)
+                wire_name = boundary_wire_name(child.alias, output_name)
                 imported_port = port_map.get(output_name)
                 if imported_port is None:
                     continue
@@ -242,8 +229,8 @@ class VerilogStructuralEmitter:
         ctx = ctx or self._emission_context
         assert ctx is not None
         emitted = False
-        for item in ctx.system.imports:
-            imported = item.system
+        for child in ctx.system.imports:
+            imported = child.resolved_system
             imported_ports = self._port_map_for(imported)
             for output_name in imported.output_variables.keys():
                 if output_name not in ctx.import_output_bindings:
@@ -254,7 +241,7 @@ class VerilogStructuralEmitter:
                 if imported_port is None:
                     continue
                 target_signal = output_name
-                source_signal = boundary_wire_name(item.alias, output_name)
+                source_signal = boundary_wire_name(child.alias, output_name)
                 _, target_port = ctx.import_output_bindings[output_name]
                 converted = self._external_output_to_target(
                     source_signal,
@@ -263,13 +250,13 @@ class VerilogStructuralEmitter:
                     imported_port.signed,
                     0
                     if imported_port.kind != "fixed"
-                    else self._config_for(imported).real_encoding.frac_bits,
+                    else self._config_for(imported).require_real_encoding().frac_bits,
                     target_port.kind,
                     target_port.width,
                     target_port.signed,
                     0
                     if target_port.kind != "fixed"
-                    else ctx.config.real_encoding.frac_bits,
+                    else ctx.config.require_real_encoding().frac_bits,
                 )
                 self.add_line(f"assign {target_signal} = {converted};")
                 emitted = True
@@ -281,10 +268,7 @@ class VerilogStructuralEmitter:
         ctx = ctx or self._emission_context
         assert ctx is not None
         for item in ctx.config.externals:
-            if item.definition is None:
-                raise ValueError(
-                    f"External '{item.alias}' is not resolved to a reusable schema"
-                )
+            assert item.definition is not None  # checked by _build_binding_maps
             for port in item.definition.ports:
                 if port.dir == "output":
                     signed = (
@@ -313,10 +297,7 @@ class VerilogStructuralEmitter:
         emitted = False
         output_names = set(ctx.system.output_variables.keys())
         for item in config.externals:
-            if item.definition is None:
-                raise ValueError(
-                    f"External '{item.alias}' is not resolved to a reusable schema"
-                )
+            assert item.definition is not None  # checked by _build_binding_maps
             for port in item.definition.ports:
                 if port.dir != "output":
                     continue
@@ -328,7 +309,9 @@ class VerilogStructuralEmitter:
                 source_signal = boundary_wire_name(item.alias, port.name)
                 assert config.real_encoding is not None
                 source_frac_bits = (
-                    config.real_encoding.frac_bits if port.kind == "fixed" else 0
+                    config.require_real_encoding().frac_bits
+                    if port.kind == "fixed"
+                    else 0
                 )
                 target_encoding = None
                 if target_ref in ctx.external_output_bindings:
@@ -337,9 +320,9 @@ class VerilogStructuralEmitter:
                 elif "." not in target_ref and target_ref in ctx.system.variables:
                     target_signal = self._state_name(target_ref)
                     target_kind = "fixed"
-                    target_width = config.real_encoding.width
-                    target_signed = config.real_encoding.signed
-                    target_frac_bits = config.real_encoding.frac_bits
+                    target_width = config.require_real_encoding().width
+                    target_signed = config.require_real_encoding().signed
+                    target_frac_bits = config.require_real_encoding().frac_bits
                 else:
                     target_signal = self._reference_signal(target_ref)
                     target_encoding = self._reference_encoding(target_ref, ctx)
@@ -373,21 +356,21 @@ class VerilogStructuralEmitter:
         ctx = ctx or self._emission_context
         assert ctx is not None
         config = ctx.config
-        for item in ctx.system.imports:
-            imported = item.system
+        for child in ctx.system.imports:
+            imported = child.resolved_system
             imported_config = self._config_for(imported)
             imported_ports = self._port_map_for(imported)
-            self.add_line(f"{imported.module_config.name} {item.alias} (")
+            self.add_line(f"{imported.module_config.name} {child.alias} (")
             connections = []
             connections.append(f".{imported_config.clock.name}({config.clock.name})")
             connections.append(f".{imported_config.reset.name}({config.reset.name})")
             for input_name in imported.input_variables.keys():
-                ref = item.connections.get(input_name, "0")
+                ref = child.connections.get(input_name, "0")
                 imported_port = imported_ports.get(input_name)
                 if imported_port is None:
                     continue
                 connections.append(
-                    f".{imported_port.verilog_name}({self._resolve_connection(ref, imported_port.kind, imported_port.width, imported_port.signed, 0 if imported_port.kind != 'fixed' else imported_config.real_encoding.frac_bits, ctx)})"
+                    f".{imported_port.verilog_name}({self._resolve_connection(ref, imported_port.kind, imported_port.width, imported_port.signed, 0 if imported_port.kind != 'fixed' else imported_config.require_real_encoding().frac_bits, ctx)})"
                 )
             for output_name in imported.output_variables.keys():
                 imported_port = imported_ports.get(output_name)
@@ -397,7 +380,7 @@ class VerilogStructuralEmitter:
                     else output_name
                 )
                 connections.append(
-                    f".{port_name}({boundary_wire_name(item.alias, output_name)})"
+                    f".{port_name}({boundary_wire_name(child.alias, output_name)})"
                 )
             for index, conn in enumerate(connections):
                 suffix = "," if index < len(connections) - 1 else ""
@@ -406,10 +389,7 @@ class VerilogStructuralEmitter:
             self.add_line()
 
         for item in config.externals:
-            if item.definition is None:
-                raise ValueError(
-                    f"External '{item.alias}' is not resolved to a reusable schema"
-                )
+            assert item.definition is not None  # checked by _build_binding_maps
             header = item.definition
             param_lines = []
             merged_params = dict(header.parameters)
@@ -435,7 +415,9 @@ class VerilogStructuralEmitter:
                         port.kind,
                         port.width,
                         port.signed,
-                        0 if port.kind != "fixed" else config.real_encoding.frac_bits,
+                        0
+                        if port.kind != "fixed"
+                        else config.require_real_encoding().frac_bits,
                         ctx,
                     )
                 connections.append(f".{port.name}({target})")
@@ -465,7 +447,9 @@ class VerilogStructuralEmitter:
             top_port.kind,
             top_port.width,
             top_port.signed,
-            ctx.config.real_encoding.frac_bits if top_port.kind == "fixed" else 0,
+            ctx.config.require_real_encoding().frac_bits
+            if top_port.kind == "fixed"
+            else 0,
         )
         return self._convert_signal_by_encoding(
             source_signal, source_encoding, target_encoding, ctx
@@ -485,9 +469,9 @@ class VerilogStructuralEmitter:
                 alias, port = ctx.import_output_bindings[output_name]
                 source_signal = boundary_wire_name(alias, port.name)
                 imported_config = None
-                for item in ctx.system.imports:
-                    if item.alias == alias:
-                        imported_config = self._config_for(item.system)
+                for child in ctx.system.imports:
+                    if child.alias == alias:
+                        imported_config = self._config_for(child.resolved_system)
                         break
                 assert imported_config is not None
                 assert imported_config.real_encoding is not None
@@ -502,14 +486,13 @@ class VerilogStructuralEmitter:
                     top_port.kind,
                     top_port.width,
                     top_port.signed,
-                    0 if top_port.kind != "fixed" else config.real_encoding.frac_bits,
+                    0
+                    if top_port.kind != "fixed"
+                    else config.require_real_encoding().frac_bits,
                     ctx,
                 )
             for item in config.externals:
-                if item.definition is None:
-                    raise ValueError(
-                        f"External '{item.alias}' is not resolved to a reusable schema"
-                    )
+                assert item.definition is not None  # checked by _build_binding_maps
                 for port in item.definition.ports:
                     if port.dir != "output":
                         continue
@@ -522,13 +505,15 @@ class VerilogStructuralEmitter:
                         port.kind,
                         port.width,
                         port.signed,
-                        config.real_encoding.frac_bits if port.kind == "fixed" else 0,
+                        config.require_real_encoding().frac_bits
+                        if port.kind == "fixed"
+                        else 0,
                         top_port.kind,
                         top_port.width,
                         top_port.signed,
                         0
                         if top_port.kind != "fixed"
-                        else config.real_encoding.frac_bits,
+                        else config.require_real_encoding().frac_bits,
                         ctx,
                     )
                     break

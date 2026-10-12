@@ -4,46 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .references import boundary_wire_name
-
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
+    from .host import VerilogEmitterHost as _Host
+else:
+    _Host = object
 
 
-class VerilogStateEmitter:
+class VerilogStateEmitter(_Host):
     """Emit TENNCell state declarations and sequential/next-state logic."""
-
-    def _input_source_expression(
-        self, variable_name: str, ctx: VerilogEmissionContext | None = None
-    ) -> str:
-        """Return the source signal used to load one TENNCell input variable."""
-        ctx = ctx or self._emission_context
-        assert ctx is not None
-        if variable_name in ctx.system.input_variables:
-            return self._variable_signal_name(variable_name, ctx)
-        enc = ctx.config.real_encoding
-        assert enc is not None
-        if variable_name in ctx.external_output_bindings:
-            external, port = ctx.external_output_bindings[variable_name]
-            source_signal = boundary_wire_name(external.alias, port.name)
-            return self._external_output_to_target(
-                source_signal,
-                port.kind,
-                port.width,
-                port.signed,
-                0 if port.kind != "fixed" else enc.frac_bits,
-                "fixed",
-                enc.width,
-                enc.signed,
-                enc.frac_bits,
-                ctx,
-            )
-        top_port = self._top_port_config(variable_name, ctx)
-        if top_port is not None:
-            return self._resolve_connection(
-                variable_name, "fixed", enc.width, enc.signed, enc.frac_bits, ctx
-            )
-        raise ValueError(f"Input variable '{variable_name}' is not bound in Verilog")
 
     def _emit_state(self, ctx: VerilogEmissionContext | None = None):
         """Emit state storage declarations for the local variables."""
@@ -111,7 +80,7 @@ class VerilogStateEmitter:
             if ctx.system.module_config.zero_reset_mode:
                 if variable_name in ctx.system.input_variables:
                     self.add_line(
-                        f"{state_name}_next = {self._input_source_expression(variable_name, ctx)};",
+                        f"{state_name}_next = {self._variable_signal_name(variable_name, ctx)};",
                         1,
                     )
                 else:
@@ -119,7 +88,7 @@ class VerilogStateEmitter:
             else:
                 if variable_name in ctx.system.input_variables:
                     self.add_line(
-                        f"{state_name}_next = {self._input_source_expression(variable_name, ctx)};",
+                        f"{state_name}_next = {self._variable_signal_name(variable_name, ctx)};",
                         1,
                     )
                 else:

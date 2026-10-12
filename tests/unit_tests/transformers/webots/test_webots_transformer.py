@@ -106,13 +106,14 @@ def test_webots_transformer_emits_initial_csv_row_when_configured():
         ),
         (
             "missing_input_binding.yaml",
-            r"missing_input_binding\.yaml:\d+: Webots configuration is missing an "
-            r"input binding for",
+            # A missing binding points at the first entry of webots.bindings.
+            r"missing_input_binding\.yaml:14: Webots configuration is missing an "
+            r"input binding for 'input_x'",
         ),
         (
             "missing_output_binding.yaml",
-            r"missing_output_binding\.yaml:\d+: Webots configuration is missing an "
-            r"output binding for",
+            r"missing_output_binding\.yaml:14: Webots configuration is missing an "
+            r"output binding for 'out'",
         ),
     ],
 )
@@ -126,6 +127,107 @@ def test_binding_errors_name_their_yaml_line(fixture, message):
 
     with pytest.raises(ValueError, match=message):
         transformer.transform(system)
+
+
+def test_default_timestep_and_special_init_values_are_emitted():
+    # No timestep: read from the robot; no outputs: the loop keeps its pass;
+    # init values -inf and nan are written as float('-inf') and float('nan').
+    input_path = _fixture_path("input/default_timestep_special_init.yaml")
+    expected_path = _fixture_path("expected/default_timestep_special_init.py")
+    raw_cache: dict[Path, dict] = {}
+
+    system = NncSystem.from_yaml(str(input_path), _raw_data_cache=raw_cache)
+    transformer = WebotsTransformer()
+    transformer.set_webots_configs(_parse_webots_configs([system], raw_cache))
+
+    assert transformer.transform(system) == expected_path.read_text(encoding="utf-8")
+
+
+_MODEL = (
+    "cells:\n  - id: 1\n    contents:\n      - speed = 0\n      - other = 0\n"
+    "    output: [speed]\nrules:\n  - 1 -> speed\nwebots:\n  bindings:\n"
+)
+_WRITE = "    speed:\n      device: wheel\n      write_method: setVelocity\n"
+
+
+def _line_of(text: str, needle: str) -> int:
+    """1-based number of the one line of ``text`` whose content is ``needle``."""
+    (number,) = [
+        n for n, line in enumerate(text.splitlines(), 1) if line.strip() == needle
+    ]
+    return number
+
+
+# YAML after `bindings:`, the content of the line the error must point to (an
+# init entry, or the first field of the binding), and the message.
+@pytest.mark.parametrize(
+    ("webots", "needle", "message"),
+    [
+        (
+            _WRITE + "  init:\n    ghost: 1\n",
+            "ghost: 1",
+            "Webots configuration references unknown TENNCell variable 'ghost'",
+        ),
+        (
+            _WRITE + "  init:\n    other: 1\n",
+            "other: 1",
+            "Webots init references unknown binding 'other'",
+        ),
+        (
+            "    speed:\n      device: wheel\n      read_method: getValue\n",
+            "device: wheel",
+            "Webots output binding 'speed' must define a write method",
+        ),
+    ],
+)
+def test_init_and_binding_errors_name_their_yaml_line(
+    tmp_path, webots, needle, message
+):
+    path = tmp_path / "model.yaml"
+    text = _MODEL + webots
+    path.write_text(text, encoding="utf-8")
+    raw_cache: dict[Path, dict] = {}
+    system = NncSystem.from_yaml(str(path), _raw_data_cache=raw_cache)
+    transformer = WebotsTransformer()
+    transformer.set_webots_configs(_parse_webots_configs([system], raw_cache))
+
+    with pytest.raises(
+        ValueError, match=rf"model\.yaml:{_line_of(text, needle)}: {message}"
+    ):
+        transformer.transform(system)
+
+
+def test_a_binding_without_methods_is_rejected_for_hand_built_configs(tmp_path):
+    # The YAML parser already requires a method; the Python API can still
+    # hand the transformer a binding without one.
+    path = tmp_path / "model.yaml"
+    text = _MODEL + _WRITE
+    path.write_text(text, encoding="utf-8")
+    raw_cache: dict[Path, dict] = {}
+    system = NncSystem.from_yaml(str(path), _raw_data_cache=raw_cache)
+    configs = _parse_webots_configs([system], raw_cache)
+    configs[system.source_path].bindings["speed"].write_method = None
+    transformer = WebotsTransformer(configs)
+    line = _line_of(text, "device: wheel")
+
+    with pytest.raises(
+        ValueError,
+        match=rf"model\.yaml:{line}: Webots binding 'speed' must define a read or write method",
+    ):
+        transformer.transform(system)
+
+
+def test_export_needs_a_yaml_source_and_a_webots_config(tmp_path):
+    path = tmp_path / "model.yaml"
+    path.write_text(_MODEL + _WRITE, encoding="utf-8")
+    raw_cache: dict[Path, dict] = {}
+    system = NncSystem.from_yaml(str(path), _raw_data_cache=raw_cache)
+
+    with pytest.raises(ValueError, match="Missing Webots configuration for"):
+        WebotsTransformer().transform(system)
+    system.source_path = None
+    with pytest.raises(ValueError, match="requires systems loaded from YAML files"):
+        WebotsTransformer().transform(system)
 
 
 def test_webots_transformer_rejects_unknown_csv_variable():

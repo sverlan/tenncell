@@ -1,6 +1,7 @@
 """Shared TENNCell YAML lowering helpers."""
 
 from collections.abc import Iterable
+from typing import Any
 
 from ....parser import parse_condition, parse_expression
 from ....parser.ast import (
@@ -69,15 +70,17 @@ def parse_structured_rule(
 ) -> Rule:
     """Lower a structured rule mapping into a model rule."""
     guard_data = rule_data.get("guard", True)
+    guard: BooleanExpression
     if isinstance(guard_data, bool):
         guard = BooleanConstantExpression(guard_data)
     else:
         guard = parse_condition(guard_data, variables, constants, aliases)
 
-    producer_data = rule_data.get("producer")
+    # Unvalidated YAML values: a wrong type fails in the parser or the lookup.
+    producer_data: Any = rule_data.get("producer")
     producer = parse_expression(producer_data, variables, constants, aliases)
 
-    consumer_variable_name = rule_data.get("consumer")
+    consumer_variable_name: Any = rule_data.get("consumer")
     consumer = variables.get(consumer_variable_name)
     if consumer is None:
         raise ValueError(

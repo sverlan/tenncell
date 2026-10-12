@@ -3,7 +3,12 @@
 from dataclasses import dataclass, field
 
 from ....model.system import NncSystem
-from ..hardware_config import PortConfig, VerilogHardwareConfig, VerilogTypeInfo
+from ..hardware_config import (
+    ExternalInstance,
+    PortConfig,
+    VerilogHardwareConfig,
+    VerilogTypeInfo,
+)
 
 
 @dataclass
@@ -14,10 +19,10 @@ class VerilogEmissionContext:
     config: VerilogHardwareConfig
     local_variables: list[str] = field(default_factory=list)
     top_ports: dict[str, PortConfig] = field(default_factory=dict)
-    external_input_bindings: dict[str, tuple[str, PortConfig]] = field(
+    external_input_bindings: dict[str, tuple[ExternalInstance, PortConfig]] = field(
         default_factory=dict
     )
-    external_output_bindings: dict[str, tuple[str, PortConfig]] = field(
+    external_output_bindings: dict[str, tuple[ExternalInstance, PortConfig]] = field(
         default_factory=dict
     )
     import_output_bindings: dict[str, tuple[str, PortConfig]] = field(

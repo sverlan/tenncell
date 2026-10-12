@@ -149,6 +149,7 @@ def lower_fsm_rules(
                     and producer_data in state_constant_map
                 ):
                     guard_data = item.get("guard", True)
+                    rule_guard: BooleanExpression
                     if isinstance(guard_data, bool):
                         rule_guard = BooleanConstantExpression(guard_data)
                     else:

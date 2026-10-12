@@ -161,7 +161,7 @@ def main():
 
         try:
             # Load TENNCell system
-            raw_data_cache = {}
+            raw_data_cache: dict[Path, dict] = {}
             nnc_system = NncSystem.from_yaml(
                 str(nnc_file),
                 import_paths=extra_import_paths,

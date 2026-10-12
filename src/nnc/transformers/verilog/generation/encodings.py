@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
 
 if TYPE_CHECKING:
-    from .conversions import VerilogConversionEmitter
+    from ..hardware_config import VerilogTypeInfo
+    from .host import VerilogEmitterHost
 
 
 @dataclass(slots=True)
@@ -32,7 +33,7 @@ VerilogEncoding: TypeAlias = VerilogLogicEncoding | VerilogFixedPointEncoding
 
 
 def encoding_from_parts(
-    emitter: VerilogConversionEmitter | None,
+    emitter: VerilogEmitterHost | None,
     kind: str,
     width: int,
     signed: bool,
@@ -52,7 +53,9 @@ def encoding_from_parts(
     return VerilogLogicEncoding(kind="logic", width=width, signed=signed)
 
 
-def type_info_encoding(emitter: VerilogConversionEmitter, type_info):
+def type_info_encoding(
+    emitter: VerilogEmitterHost, type_info: VerilogTypeInfo
+) -> VerilogEncoding:
     """Convert a Verilog type hint into a lowering encoding object."""
     from ..hardware_config import VerilogLogicTypeInfo
 
@@ -70,7 +73,7 @@ def type_info_encoding(emitter: VerilogConversionEmitter, type_info):
     )
 
 
-def type_info_decl(emitter: VerilogConversionEmitter, type_info) -> str:
+def type_info_decl(emitter: VerilogEmitterHost, type_info: VerilogTypeInfo) -> str:
     """Return the Verilog storage declaration for a typed variable."""
     from ..hardware_config import VerilogLogicTypeInfo
 

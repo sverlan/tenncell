@@ -52,7 +52,7 @@ test ="pytest --cov=nnc --cov-report=xml --cov-report=term-missing"
 builddoc = "sphinx-build -b html docs/source build/docs"
 lint = "ruff check --select F401,F821,F841 src/nnc"
 format = "ruff format src tests/unit_tests tests/functional_tests tests/cli_tests"
-typecheck = "mypy src/nnc/model src/nnc/parser src/nnc/verification src/nnc/inputs/yaml/module_config.py src/nnc/transformers/verilog/hardware_config.py src/nnc/cli.py src/nnc/cli_verify.py src/nnc/transformers/sva_transformer.py src/nnc/transformers/sva_conditions.py src/nnc/transformers/webots_transformer.py src/nnc/transformers/webots"
+typecheck = "mypy src/nnc"
 
 
 [tool.coverage.run]
@@ -62,6 +62,8 @@ omit = [
  #   "nnc/tests/*",
     "*/__main__.py",
     "*/_version.py",
+    # Type-only interfaces of the emitter mixins: never imported at runtime.
+    "*/host.py",
     "venv/*",
     "cli.py"
     ]
@@ -73,6 +75,7 @@ omit = [
  #   "nnc/tests/*",
     "*/__main__.py",
     "*/_version.py",
+    "*/host.py",
     "cli.py",
     "venv/*",
     ]
@@ -80,6 +83,8 @@ omit = [
 # in addition to standard ones
 exclude_also = [
     "if __name__ == .__main__.:",
+    # Imports for type checkers only.
+    "if TYPE_CHECKING:",
     ]
 exclude_lines = [
     "pragma: no cover",
@@ -113,6 +118,8 @@ line-length = 88
 python_version = "3.10"
 ignore_missing_imports = true
 warn_unused_configs = true
+# Also check the bodies of functions without annotations (the default skips them).
+check_untyped_defs = true
 
 [dependency-groups]
 dev = [

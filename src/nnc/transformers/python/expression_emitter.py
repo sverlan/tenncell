@@ -1,10 +1,16 @@
 """Python expression emission for TENNCell AST nodes."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ...parser.ast import *
 from ...parser.ast.value import *
 from ...parser.ast.value.math_functions import MathFunctions
+
+if TYPE_CHECKING:
+    from ...model.system import NncSystem
+    from .host import PythonEmitterHost as _Host
+else:
+    _Host = object
 
 
 CONSTANT = "constant"
@@ -52,18 +58,18 @@ class UnsupportedFunctionError(ValueError):
     """Raised when a function has no standalone generated-Python equivalent."""
 
 
-class PythonExpressionEmitter:
+class PythonExpressionEmitter(_Host):
     """Emit Python expressions from TENNCell AST nodes."""
 
-    _current_system = None
-    _uses_random = False
+    _current_system: "NncSystem | None" = None
+    _uses_random: bool = False
 
     def _reference_code(self, reference: str) -> str:
         if "." in reference:
             return f"self._ref('{reference}')"
         return f"self.{reference}"
 
-    def _get_producer_variables(self, producer_expr) -> set:
+    def _get_producer_variables(self, producer_expr: Any) -> set[str]:
         """Extract variable names used in a producer expression."""
         variables = set()
 

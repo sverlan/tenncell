@@ -16,7 +16,11 @@ from .literals import (
 )
 
 if TYPE_CHECKING:
+    from ..hardware_config import VerilogEncoding, VerilogTypeInfo
     from .context import VerilogEmissionContext
+    from .host import VerilogEmitterHost as _Host
+else:
+    _Host = object
 
 
 def conversion_helper_name(
@@ -216,10 +220,10 @@ def conversion_expression(
     )
 
 
-class VerilogConversionEmitter:
+class VerilogConversionEmitter(_Host):
     """Emit Verilog conversion helpers and fixed-point literal parameters."""
 
-    def _type_info_encoding(self, type_info):
+    def _type_info_encoding(self, type_info: VerilogTypeInfo) -> VerilogEncoding:
         from .encodings import type_info_encoding
 
         return type_info_encoding(self, type_info)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -24,22 +25,28 @@ class YamlLocation:
     line: int | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class YamlLocationIndex:
     """Path-to-source-location index for one effective YAML document."""
 
     source_path: Path
-    paths: dict[tuple[object, ...], YamlLocation | int]
+    paths: dict[tuple[object, ...], YamlLocation]
 
-    def __post_init__(self) -> None:
-        """Normalize legacy path-to-line dictionaries into location entries."""
+    def __init__(
+        self,
+        source_path: Path,
+        paths: Mapping[tuple[object, ...], YamlLocation | int],
+    ) -> None:
+        """Create an index; ``paths`` maps document paths to locations, or to
+        line numbers of ``source_path`` (the legacy form)."""
+        self.source_path = source_path
         self.paths = {
             path: (
                 location
                 if isinstance(location, YamlLocation)
-                else YamlLocation(self.source_path, location)
+                else YamlLocation(source_path, location)
             )
-            for path, location in self.paths.items()
+            for path, location in paths.items()
         }
 
     def location_for(self, *path: object) -> YamlLocation | None:

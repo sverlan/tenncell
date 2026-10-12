@@ -16,6 +16,9 @@ from .literals import emit_constant_in_encoding
 
 if TYPE_CHECKING:
     from .context import VerilogEmissionContext
+    from .host import VerilogEmitterHost as _Host
+else:
+    _Host = object
 
 
 def variable_expression_encoding(
@@ -134,15 +137,7 @@ def convert_signal_by_encoding(
 ) -> str:
     """Convert one signal between two explicit encodings."""
     ctx = ctx or emitter._emission_context
-    if (
-        source_encoding.kind == target_encoding.kind
-        and source_encoding.width == target_encoding.width
-        and source_encoding.signed == target_encoding.signed
-        and (
-            source_encoding.kind != "fixed"
-            or source_encoding.frac_bits == target_encoding.frac_bits
-        )
-    ):
+    if source_encoding == target_encoding:
         return signal
     if (
         source_encoding.kind == "fixed"
@@ -211,15 +206,7 @@ def external_output_to_target(
     target_encoding = encoding_from_parts(
         emitter, target_kind, target_width, target_signed, target_frac_bits
     )
-    if (
-        source_encoding.kind == target_encoding.kind
-        and source_encoding.width == target_encoding.width
-        and source_encoding.signed == target_encoding.signed
-        and (
-            source_encoding.kind != "fixed"
-            or source_encoding.frac_bits == target_encoding.frac_bits
-        )
-    ):
+    if source_encoding == target_encoding:
         return signal
     helper_name = emitter._conversion_helper_name(
         source_encoding.kind,
@@ -274,41 +261,6 @@ def reference_encoding(
             )
         return VerilogLogicEncoding(kind="logic", width=port.width, signed=port.signed)
 
-    if reference in ctx.import_output_bindings:
-        _, port = ctx.import_output_bindings[reference]
-        imported_name = reference
-        for item in ctx.system.imports:
-            if imported_name in item.system.output_variables:
-                imported_config = emitter._config_for(item.system)
-                imported_ports = {
-                    p.name: p
-                    for p in (
-                        imported_config.ports or emitter._infer_ports(item.system)
-                    )
-                }
-                imported_port = imported_ports.get(imported_name, port)
-                if imported_port.kind == "fixed":
-                    assert imported_config.real_encoding is not None
-                    return VerilogFixedPointEncoding(
-                        kind="fixed",
-                        width=imported_port.width,
-                        signed=imported_port.signed,
-                        frac_bits=imported_config.real_encoding.frac_bits,
-                    )
-                return VerilogLogicEncoding(
-                    kind="logic",
-                    width=imported_port.width,
-                    signed=imported_port.signed,
-                )
-        if port.kind == "fixed":
-            return VerilogFixedPointEncoding(
-                kind="fixed",
-                width=port.width,
-                signed=port.signed,
-                frac_bits=config.real_encoding.frac_bits,
-            )
-        return VerilogLogicEncoding(kind="logic", width=port.width, signed=port.signed)
-
     if reference in ctx.local_variables:
         enc = config.real_encoding
         assert enc is not None
@@ -322,7 +274,7 @@ def reference_encoding(
     head, _, tail = reference.partition(".")
     for item in ctx.system.imports:
         if item.alias == head:
-            imported = item.system
+            imported = item.resolved_system
             if tail in imported.output_variables:
                 enc = emitter._config_for(imported).real_encoding
                 assert enc is not None
@@ -345,15 +297,7 @@ def maybe_convert_signal(
     """Apply a conversion helper only when the source and target differ."""
     ctx = ctx or emitter._emission_context
     source_encoding = reference_encoding(emitter, reference, ctx)
-    if (
-        source_encoding.kind == target_encoding.kind
-        and source_encoding.width == target_encoding.width
-        and source_encoding.signed == target_encoding.signed
-        and (
-            source_encoding.kind != "fixed"
-            or source_encoding.frac_bits == target_encoding.frac_bits
-        )
-    ):
+    if source_encoding == target_encoding:
         return signal
     if (
         source_encoding.kind == "fixed"
@@ -375,20 +319,22 @@ def maybe_convert_signal(
     return f"{helper_name}({signal})"
 
 
-class VerilogReferenceResolver:
+class VerilogReferenceResolver(_Host):
     """Resolve TENNCell references and boundary conversions for Verilog emission."""
 
-    def _encoding_from_parts(self, kind, width, signed, frac_bits):
+    def _encoding_from_parts(
+        self, kind: str, width: int, signed: bool, frac_bits: int
+    ) -> VerilogEncoding:
         return encoding_from_parts(self, kind, width, signed, frac_bits)
 
     def _variable_expression_encoding(
         self, variable_name: str, ctx: VerilogEmissionContext | None = None
-    ):
+    ) -> VerilogEncoding:
         return variable_expression_encoding(self, variable_name, ctx)
 
     def _variable_state_encoding(
         self, variable_name: str, ctx: VerilogEmissionContext | None = None
-    ):
+    ) -> VerilogEncoding:
         return variable_state_encoding(self, variable_name, ctx)
 
     def _reference_signal_name(self, reference: str) -> str:
@@ -429,7 +375,7 @@ class VerilogReferenceResolver:
 
     def _top_port_config(
         self, port_name: str, ctx: VerilogEmissionContext | None = None
-    ):
+    ) -> PortConfig | None:
         return top_port_config(self, port_name, ctx)
 
     def _top_port_signal_name(
@@ -466,7 +412,7 @@ class VerilogReferenceResolver:
 
     def _reference_encoding(
         self, reference: str, ctx: VerilogEmissionContext | None = None
-    ):
+    ) -> VerilogEncoding:
         return reference_encoding(self, reference, ctx)
 
     def _maybe_convert_signal(

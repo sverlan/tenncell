@@ -120,11 +120,11 @@ class VerilogTransformer(
                 return
             resolved[name] = type_info
 
-        for item in system.imports:
-            imported_config = self._config_for(item.system)
-            imported_ports = self._port_map_for(item.system)
-            for input_name in item.system.input_variables.keys():
-                ref = item.connections.get(input_name, "0")
+        for child in system.imports:
+            imported_config = self._config_for(child.resolved_system)
+            imported_ports = self._port_map_for(child.resolved_system)
+            for input_name in child.resolved_system.input_variables.keys():
+                ref = child.connections.get(input_name, "0")
                 if "." in ref or ref == "0":
                     continue
                 imported_port = imported_ports.get(input_name)
@@ -136,7 +136,7 @@ class VerilogTransformer(
                         imported_port, imported_config.real_encoding
                     ),
                 )
-            for output_name in item.system.output_variables.keys():
+            for output_name in child.resolved_system.output_variables.keys():
                 if output_name not in system.variables:
                     continue
                 imported_port = imported_ports.get(output_name)
@@ -154,10 +154,10 @@ class VerilogTransformer(
             if item.definition is None:
                 continue
             for port in item.definition.ports:
-                ref = item.connections.get(port.name)
-                if ref is None or "." in ref or ref == "0":
+                external_ref = item.connections.get(port.name)
+                if external_ref is None or "." in external_ref or external_ref == "0":
                     continue
-                add(ref, self._type_info_from_port(port, config.real_encoding))
+                add(external_ref, self._type_info_from_port(port, config.real_encoding))
 
         return resolved
 
@@ -247,7 +247,7 @@ class VerilogTransformer(
         names += [(name, "a constant name") for name in system.constants]
         for item in system.imports:
             # The parent instantiates the child by module name and port names.
-            child = item.system
+            child = item.resolved_system
             names.append(
                 (
                     child.module_config.name,
