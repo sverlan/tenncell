@@ -1,0 +1,8 @@
+# An unused condition on empty branches produces no model rule.
+module:
+  include: [common.yaml]
+rules:
+  - if: x * y > 0
+    then: []
+    else: []
+  - x -> z

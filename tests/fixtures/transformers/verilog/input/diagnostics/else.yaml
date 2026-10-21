@@ -1,0 +1,8 @@
+# An unsupported producer in the else branch keeps its source line.
+module:
+  include: [common.yaml]
+rules:
+  - if: x > 0
+    then: x -> z
+    else:
+      - x * y -> z

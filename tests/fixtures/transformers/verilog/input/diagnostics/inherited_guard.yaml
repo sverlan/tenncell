@@ -1,0 +1,6 @@
+# An inherited condition is reported at a resulting rule with its full guard.
+module:
+  include: [common.yaml]
+rules:
+  - if: x * y > 0
+    then: x -> z

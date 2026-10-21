@@ -1,0 +1,13 @@
+module:
+  include: [common.yaml]
+rules:
+  - repeat:
+      var: i
+      range: [0, 2]
+      body:
+        - x + ${i} -> z
+  - repeat:
+      var: j
+      range: [0, 1]
+      body:
+        - x * y + ${j} -> z

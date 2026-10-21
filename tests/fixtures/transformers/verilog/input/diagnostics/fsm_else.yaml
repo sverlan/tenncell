@@ -1,0 +1,14 @@
+# FSM else branches preserve the originating rule's line.
+module:
+  include: [common.yaml]
+fsm:
+  - name: machine
+    variable: state
+    initial: active
+    states:
+      - active:
+          rules:
+            - if: x > 0
+              then: x -> z
+              else:
+                - x * y -> z

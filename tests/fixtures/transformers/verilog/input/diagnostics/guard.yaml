@@ -1,0 +1,4 @@
+module:
+  include: [common.yaml]
+rules:
+  - "x * y > 0 : x -> z"

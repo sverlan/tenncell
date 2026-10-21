@@ -1,0 +1,5 @@
+# General division is rejected during pre-emission expression validation.
+module:
+  include: [common.yaml]
+rules:
+  - x / y -> z

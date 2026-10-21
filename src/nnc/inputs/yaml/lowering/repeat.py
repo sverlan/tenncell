@@ -17,10 +17,11 @@ _PLACEHOLDER_BODY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(?:([+-])([1-9][0-9
 
 @dataclass(slots=True)
 class ExpandedRepeatItem:
-    """A YAML list item and the original path used for error reporting."""
+    """An expanded item, its expansion site, and its rule body source origin."""
 
     value: Any
     origin_path: tuple[object, ...]
+    source_origin: tuple[object, ...] | None = None
 
 
 def expand_repeat_items(
@@ -117,7 +118,11 @@ def _expand_repeat_item(
             (*repeat_path, "repeat", "body"),
             next_bindings,
         ):
-            expanded.append(ExpandedRepeatItem(item.value, repeat_path))
+            expanded.append(
+                ExpandedRepeatItem(
+                    item.value, repeat_path, item.source_origin or item.origin_path
+                )
+            )
     return expanded
 
 

@@ -16,6 +16,10 @@ descriptions, and that tests should treat as the current public contract.
 - `nnc.model.ModuleConfig`
 - `nnc.model.ResolvedReference`
 
+`Rule.source_location` is a physical `YamlLocation` (source path and 1-based
+rule line), or `None` without YAML provenance. It remains attached when a rule
+is moved to another system; it is not a path into that system's source index.
+
 ## Parser entry points
 
 - `nnc.parser.parse_expression`
@@ -36,6 +40,14 @@ descriptions, and that tests should treat as the current public contract.
   configured with `nnc.verification.sva.SvaOptions`; invalid options raise
   `nnc.verification.sva.SvaOptionsError`. The `-t sva` command line is not
   exposed yet.
+
+`VerilogTransformer.transform` and `observe`, and the RTL generation within
+`SvaTransformer.generate`, raise `YamlLocatedError` (a `ValueError`) for
+unsupported rule expressions detected before emission. These errors identify
+the producer or guard, display the effective rule, and include its original
+physical YAML file and rule line when available. A rule without provenance
+uses the system file, when known, without guessing a line. This guarantee does
+not extend to encoding, reference, or conversion failures during emission.
 
 ## Verilog config model
 

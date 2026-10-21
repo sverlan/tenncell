@@ -14,6 +14,7 @@ from ....parser.ast import (
 from ....parser.ast.value import FloatValue
 from ....parser.ast.variable import Variable
 from ....model.rule import Rule
+from ..locations import YamlLocation, YamlLocationIndex
 
 
 def register_initial_declarations(
@@ -91,7 +92,23 @@ def parse_structured_rule(
 
 def with_guard(rule: Rule, extra_guard: BooleanExpression) -> Rule:
     """Attach an additional guard condition to a lowered rule."""
-    return Rule(rule.consumer, rule.producer, combine_guards(extra_guard, rule.guard))
+    guarded = Rule(
+        rule.consumer, rule.producer, combine_guards(extra_guard, rule.guard)
+    )
+    guarded.source_location = rule.source_location
+    return guarded
+
+
+def attach_rule_location(
+    rule: Rule,
+    locations: YamlLocationIndex | None,
+    origin: tuple[object, ...] | None,
+) -> None:
+    """Resolve a rule's exact YAML origin without guessing from nearby entries."""
+    if locations is not None and origin is not None:
+        location = locations.location_for(*origin)
+        if location is not None:
+            rule.source_location = YamlLocation(location.source_path, location.line)
 
 
 def make_transition_rule(

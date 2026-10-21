@@ -34,6 +34,7 @@ should verify these promises, not internal implementation details.
 - `NncSystem.validate_references()` rejects invalid local, imported, and qualified references.
 - Constant expressions are evaluated in declaration order and may only reference earlier constants.
 - FSM sugar is lowered into state constants, initialization, and guarded rules.
+- Top-level YAML rule entries must be strings or mappings; null entries and nested lists are rejected.
 
 ## Parser and Value Contracts
 
@@ -68,6 +69,7 @@ should verify these promises, not internal implementation details.
 - Port boundary conversions are inserted automatically when local TENNCell values cross `verilog.ports` or external module boundaries.
 - `verilog.ports` preserves optional `kind` metadata and defaults it to `logic` when omitted.
 - Unsupported Verilog expressions are rejected with clear errors.
+- Before emission, unsupported rule expressions raise `YamlLocatedError` (also a `ValueError`) identifying the producer/guard and effective rule, plus its physical YAML file and line when available. `transform` and `observe` preserve a moved rule's original location; a programmatic rule without one never borrows a line from the recipient's location index.
 - An external module may be described inline with `schema` instead of a header file; its fixed-point output port (here 12 bits) drives a root input and is converted to the module encoding where a rule reads it (golden `inline_schema_external`).
 - `VerilogHardwareConfig.require_real_encoding()` returns the module encoding or raises the "requires a verilog.real_encoding section" error; `ImportConfig.resolved_system` returns the loaded child or raises an error naming the unresolved alias.
 - `YamlLocationIndex` accepts locations or legacy line numbers (taken as lines of its own file), keeps each location's source file, and does not alias the dictionary it was given.
@@ -119,6 +121,7 @@ should verify these promises, not internal implementation details.
 - CLI failures do not abort the remaining inputs.
 - Exit status is `0` on full success and `1` when any file fails.
 - Invalid transformer types and missing files produce clear error messages.
+- `nnc-gen -t verilog` and `-t sva` report pre-emission multiplication, general-division and function-call errors with rule context and the physical source file/line through includes, imports, repeats, both structured branches and FSM rules (including scalar bodies and string/structured transitions). A later FSM guard is reported at its own transition. An enclosing `if` guard is reported at a resulting rule; empty branches produce no rule and their unused conditions require no RTL support.
 - `nnc-gen -t mc2` writes the three MC2 files with `--output-suffix`, prints transformer warnings to stderr, and continues the batch after an invalid file.
 - `nnc-gen -t sva --sva-style concurrent` writes `assert property` checks; with weak semantics it is an error (exit `1`).
 - `nnc-gen -t sva` writes the RTL closure, checker, testbench and (with `--sva-inputs`) the hex and decoded input files; `--delimiter`/`--skip-lines` reach the input reader; `--sva-source` files are copied to `sva_sources/` (no directory without sources). Formal mode writes `<stem>.sby`, the checker and the bind file, without testbench (depth `D + 2` in the `.sby`); `both` writes everything; a stimulus in formal mode is an error (exit `1`). Option misuse is a usage error (exit `2`): `--sva-*`, `--delimiter` or `--skip-lines` with another target, concurrent style with formal modes, `--sva-depth` in simulation mode, invalid bounds or steps, `--sva-inputs` with `--sva-steps`, `--delimiter`/`--skip-lines` without `--sva-inputs`, `--output-suffix`. A stimulus that does not fit the model is an error (exit `1`) and writes nothing.

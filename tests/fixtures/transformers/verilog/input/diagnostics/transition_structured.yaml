@@ -1,0 +1,17 @@
+# Structured transitions retain the later transition's diagnostic origin.
+module:
+  include: [common.yaml]
+fsm:
+  - name: machine
+    variable: state
+    initial: active
+    states:
+      - active:
+          rules:
+            - guard: x > 0
+              producer: active
+              consumer: state
+            - guard: x * y > 0
+              producer: done
+              consumer: state
+      - done: {}

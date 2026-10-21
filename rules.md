@@ -309,6 +309,7 @@
   - integer multiply/divide AST nodes
   - boolean comparisons `< <= > >= == !=`
   - boolean `&& || !`
+- Unsupported rule expressions detected before Verilog emission (also used by `nnc-gen -t sva`) raise `YamlLocatedError`, a `ValueError` subclass, with the physical YAML file and rule line when available, the producer/guard context, and the effective rule. This guarantee does not cover later encoding, reference, or conversion errors during emission. Physical locations survive includes, repeat expansion, structured branches, FSM lowering, and moving a rule to another system. Producers are validated in rule order, then guards in reverse rule order, so a later FSM transition's unsupported guard is diagnosed at its own rule before an earlier transition that contains its exclusion. For enclosing `if` conditions the location identifies a resulting rule, rather than the `if` or operator. An `if` with empty branches produces no rule, so its unused condition is not checked by the RTL backend. Programmatic rules without their own location report rule context and, when known, the system's file without a guessed line number.
 - Rejected clearly:
   - generic function calls
   - variable-by-variable multiplication

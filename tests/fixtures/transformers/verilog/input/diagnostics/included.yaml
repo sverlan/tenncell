@@ -1,0 +1,2 @@
+module:
+  include: [common.yaml, fragment.yaml]

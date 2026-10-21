@@ -1,0 +1,10 @@
+# FSM rules also accept a single scalar with its own location.
+module:
+  include: [common.yaml]
+fsm:
+  - name: machine
+    variable: state
+    initial: active
+    states:
+      - active:
+          rules: x * y -> z

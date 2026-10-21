@@ -1,0 +1,7 @@
+module:
+  include: [common.yaml]
+imports:
+  - module: producer.yaml
+    as: child
+rules:
+  - x -> z

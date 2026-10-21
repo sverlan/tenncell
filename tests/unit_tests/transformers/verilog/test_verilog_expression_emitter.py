@@ -31,6 +31,9 @@ from nnc.parser.ast import (
 from nnc.parser.ast.expression import FunctionCallExpression
 from nnc.parser.ast.value import FloatValue
 from nnc.model.system import NncSystem
+from nnc.model.rule import Rule
+from nnc.inputs.yaml.errors import YamlLocatedError
+from nnc.inputs.yaml.locations import YamlLocationIndex
 from nnc.transformers import VerilogTransformer
 from nnc.transformers.verilog.generation.context import VerilogEmissionContext
 from nnc.transformers.verilog.hardware_config import VerilogLogicTypeInfo
@@ -66,8 +69,58 @@ class TestVerilogExpressionEmitter:
         system = NncSystem.from_yaml(str(system_file))
         transformer = VerilogTransformer()
 
-        with pytest.raises(ValueError, match="function calls"):
+        with pytest.raises(ValueError, match="function calls") as caught:
             transformer._validate_supported_system(system)
+        message = str(caught.value)
+        assert f"{system_file}:7:" in message
+        assert "in producer of rule:" in message
+        assert "sin(x)" in message
+
+    @pytest.mark.parametrize("method", ["transform", "observe"])
+    @pytest.mark.parametrize("known_source", [False, True])
+    def test_rule_error_without_yaml_metadata_still_has_context(
+        self, method, known_source
+    ):
+        x = Variable("x", FloatValue(1.0))
+        y = Variable("y", FloatValue(2.0))
+        system = NncSystem()
+        if known_source:
+            system.source_path = Path("other.yaml")
+            system.source_locations = YamlLocationIndex(
+                system.source_path, {("rules", 0): 99}
+            )
+        system.add_rule(
+            Rule(
+                x,
+                MultiplicationExpression(VariableExpression(x), VariableExpression(y)),
+                BooleanConstantExpression(True),
+            )
+        )
+
+        with pytest.raises(YamlLocatedError) as caught:
+            getattr(VerilogTransformer(), method)(system)
+
+        assert caught.value.source_path == system.source_path
+        assert caught.value.line is None
+        assert "in producer of rule: True : (x * y) -> x" in str(caught.value)
+
+    @pytest.mark.parametrize("method", ["transform", "observe"])
+    def test_moved_rule_keeps_its_original_physical_location(self, method):
+        source_file = INPUT_ROOT / "bad.yaml"
+        original = NncSystem.from_yaml(str(source_file))
+        recipient = NncSystem()
+        recipient.source_path = Path("other.yaml")
+        recipient.source_locations = YamlLocationIndex(
+            recipient.source_path, {("rules", 0): 99}
+        )
+        recipient.add_rule(original.rules[0])
+
+        with pytest.raises(YamlLocatedError) as caught:
+            getattr(VerilogTransformer(), method)(recipient)
+
+        assert caught.value.source_path == source_file
+        assert caught.value.line == 7
+        assert "in producer of rule:" in str(caught.value)
 
     def test_validate_expression_and_visitors(self):
         _, transformer = load_verilog_system(

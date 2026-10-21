@@ -67,10 +67,19 @@ For each change in logic, behavior, schema, or code generation:
 
 # Agent Instructions
 
-If `AGENTS_INTERACTION.md` exists in the repository root, read and follow it before beginning work.
+If `AGENT_PROTOCOL.md` exists in the repository root, read and follow it before beginning work.
 
-`AGENTS_INTERACTION.md` contains local agent-to-agent collaboration rules and may not be present in every checkout.
+`AGENT_PROTOCOL.md` contains local agent-to-agent collaboration rules and may not be present in every checkout.
 
 If the file does not exist, continue normally without it.
 
-Unless `AGENTS_INTERACTION.md` says otherwise, follow the repository's normal instructions and the user's explicit requests.
+Unless `AGENT_PROTOCOL.md` says otherwise, follow the repository's normal instructions and the user's explicit requests.
+
+## Subagent model selection
+
+- Whenever possible, delegate bounded, low-risk tasks to subagents and explicitly choose a cheaper model when it is adequate; do not default to running another copy of the primary model for routine work.
+- Good candidates include running test, lint, type-check or coverage commands; summarizing long command output so it does not consume the primary agent's context; listing changed files or repository facts; checking documentation links and status tables; locating definitions and callers; and performing narrow, mechanical consistency checks.
+- Use another copy of the primary model only when the delegated task itself needs comparable reasoning depth, such as an independent review of subtle temporal semantics or a genuinely complex parallel investigation.
+- Keep architecture decisions, subtle SVA semantic analysis, final review judgments and risky repository changes with a model capable of handling their full complexity.
+- Give each subagent a narrow task and request a concise result containing the command outcome, failures and material evidence rather than the complete raw log.
+- The primary agent remains responsible for checking the subagent's conclusions and for the final result. Delegation does not relax any validation, safety, role or review requirement in this guide or `AGENT_PROTOCOL.md`.

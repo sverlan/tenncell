@@ -1,8 +1,15 @@
 """Core TENNCell rule model."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from ..parser.ast.boolean_expression import BooleanExpression
 from ..parser.ast.expression import Expression
 from ..parser.ast.variable import Variable
+
+if TYPE_CHECKING:
+    from ..inputs.yaml.locations import YamlLocation
 
 
 class Rule:
@@ -12,6 +19,11 @@ class Rule:
         consumer: Variable updated by the rule.
         producer: Expression producing the value to add to the consumer.
         guard: Boolean expression deciding whether the rule is active.
+
+    Attributes:
+        source_location: Physical YAML file and rule line for diagnostics, or
+            ``None`` for rules constructed without YAML source metadata. This
+            location remains attached if the rule is moved to another system.
     """
 
     guard: BooleanExpression
@@ -33,6 +45,7 @@ class Rule:
         self.producer = producer
         self.consumer = consumer
         self.vars: dict[str, Variable] = producer.get_variables()
+        self.source_location: YamlLocation | None = None
 
     def __str__(self):
         """Render the rule in TENNCell source form."""

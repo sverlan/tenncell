@@ -179,7 +179,10 @@ class VerilogTransformer(
 
         Raises:
             ValueError: If the system cannot be emitted as Verilog.
-            YamlLocatedError: If a Verilog type hint is invalid.
+            YamlLocatedError: If a Verilog type hint is invalid or a rule uses
+                an unsupported expression detected before emission; these errors
+                include the physical YAML rule location
+                when available and the guard/producer context.
         """
         previous = self._emission_context
         try:
@@ -274,6 +277,21 @@ class VerilogTransformer(
                 )
 
     def transform(self, system: NncSystem) -> str:
+        """Generate the SystemVerilog module for one TENNCell system.
+
+        Args:
+            system: System loaded from YAML with its Verilog configuration.
+
+        Returns:
+            The generated SystemVerilog module source.
+
+        Raises:
+            ValueError: If the model or configuration cannot be emitted.
+            YamlLocatedError: For invalid type hints or unsupported rule
+                expressions detected before emission. These errors identify
+                the producer or guard, show the effective rule, and include
+                its physical YAML rule location when available.
+        """
         self.reset()
         ctx = self._build_emission_context(system)
         module_name = system.module_config.name

@@ -1,0 +1,13 @@
+# A later transition guard must be diagnosed at its own line.
+module:
+  include: [common.yaml]
+fsm:
+  - name: machine
+    variable: state
+    initial: active
+    states:
+      - active:
+          rules:
+            - "x > 0 : active -> state"
+            - "x * y > 0 : done -> state"
+      - done: {}

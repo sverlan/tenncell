@@ -117,7 +117,9 @@ class SvaTransformer:
                 model or mode, or an input record that cannot be encoded
                 (see ``build_stimulus``).
             YamlLocatedError: For a property or raw entry the backend cannot
-                handle (see ``select_sva``).
+                handle (see ``select_sva``), or an unsupported RTL rule
+                expression detected before emission, including its physical
+                YAML rule location and guard/producer context.
         """
         from ..cli_transform import _collect_import_closure
 

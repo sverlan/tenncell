@@ -5,7 +5,9 @@ from ....parser.ast import BooleanConstantExpression, BooleanExpression, Express
 from ....parser.ast.value import FloatValue
 from ....parser.ast.variable import Variable
 from ....model.rule import Rule
+from ..locations import YamlLocationIndex
 from .common import (
+    attach_rule_location,
     combine_guards,
     guard_negation,
     make_transition_rule,
@@ -73,11 +75,14 @@ def lower_fsm_rules(
     constants: dict[str, FloatValue],
     aliases: dict[str, Expression],
     fsm_constants: dict[str, dict[str, str]],
+    *,
+    source_origin: tuple[object, ...] | None = None,
+    locations: YamlLocationIndex | None = None,
 ) -> list[Rule]:
     """Lower FSM rules into model rules and resolve state transitions."""
     lowered: list[Rule] = []
 
-    for fsm_entry in fsm_data or []:
+    for fsm_index, fsm_entry in enumerate(fsm_data or []):
         fsm_name = fsm_entry["name"]
         fsm_variable_name = fsm_entry["variable"]
         fsm_variable = variables[fsm_variable_name]
@@ -90,10 +95,21 @@ def lower_fsm_rules(
         fsm_parse_constants.update(local_state_constants)
 
         def lower_state_items(
-            raw_items, accumulated_guard: BooleanExpression
+            raw_items,
+            accumulated_guard: BooleanExpression,
+            origin: tuple[object, ...] | None,
         ) -> list[Rule]:
             state_rules: list[Rule] = []
-            for item in normalize_rule_items(raw_items):
+            for item_index, item in enumerate(normalize_rule_items(raw_items)):
+                item_origin = origin
+                if origin is not None and isinstance(raw_items, list):
+                    item_origin = (*origin, item_index)
+
+                def append_rule(rule: Rule) -> None:
+                    """Keep the YAML origin on a lowered FSM rule."""
+                    attach_rule_location(rule, locations, item_origin)
+                    state_rules.append(rule)
+
                 if isinstance(item, str):
                     rule = parse_rule(item, variables, fsm_parse_constants, aliases)
                     producer_text = item.rsplit("->", 1)[0]
@@ -107,7 +123,7 @@ def lower_fsm_rules(
                         rule.consumer.name == fsm_variable_name
                         and producer_text in state_constant_map
                     ):
-                        state_rules.append(
+                        append_rule(
                             make_transition_rule(
                                 fsm_variable,
                                 state_constant_map[producer_text],
@@ -118,7 +134,7 @@ def lower_fsm_rules(
                             )
                         )
                     else:
-                        state_rules.append(with_guard(rule, accumulated_guard))
+                        append_rule(with_guard(rule, accumulated_guard))
                     continue
 
                 if not isinstance(item, dict):
@@ -131,13 +147,25 @@ def lower_fsm_rules(
                         item["if"], variables, fsm_parse_constants, aliases
                     )
                     then_guard = combine_guards(accumulated_guard, condition)
-                    state_rules.extend(lower_state_items(item.get("then"), then_guard))
+                    state_rules.extend(
+                        lower_state_items(
+                            item.get("then"),
+                            then_guard,
+                            (*item_origin, "then") if item_origin is not None else None,
+                        )
+                    )
                     if "else" in item:
                         else_guard = combine_guards(
                             accumulated_guard, guard_negation(condition)
                         )
                         state_rules.extend(
-                            lower_state_items(item.get("else"), else_guard)
+                            lower_state_items(
+                                item.get("else"),
+                                else_guard,
+                                (*item_origin, "else")
+                                if item_origin is not None
+                                else None,
+                            )
                         )
                     continue
 
@@ -156,7 +184,7 @@ def lower_fsm_rules(
                         rule_guard = parse_condition(
                             guard_data, variables, fsm_parse_constants, aliases
                         )
-                    state_rules.append(
+                    append_rule(
                         make_transition_rule(
                             fsm_variable,
                             state_constant_map[producer_data],
@@ -170,11 +198,11 @@ def lower_fsm_rules(
                     rule = parse_structured_rule(
                         item, variables, fsm_parse_constants, aliases
                     )
-                    state_rules.append(with_guard(rule, accumulated_guard))
+                    append_rule(with_guard(rule, accumulated_guard))
 
             return state_rules
 
-        for state_entry in fsm_entry.get("states", []):
+        for state_index, state_entry in enumerate(fsm_entry.get("states", [])):
             state_name = next(iter(state_entry))
             state_body = state_entry[state_name] or {}
             state_guard = parse_condition(
@@ -183,7 +211,14 @@ def lower_fsm_rules(
                 fsm_parse_constants,
                 aliases,
             )
-            state_rules = lower_state_items(state_body.get("rules"), state_guard)
+            state_origin = (
+                (*source_origin, fsm_index, "states", state_index, state_name, "rules")
+                if source_origin is not None
+                else None
+            )
+            state_rules = lower_state_items(
+                state_body.get("rules"), state_guard, state_origin
+            )
 
             transition_indexes = [
                 index

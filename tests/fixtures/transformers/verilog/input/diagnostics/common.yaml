@@ -1,0 +1,9 @@
+cells:
+  - id: 1
+    contents: [x = 1, y = 2, z = 0, state = 0]
+verilog:
+  real_encoding: {kind: fixed_point, signed: true, width: 16, frac_bits: 8}
+verification:
+  properties:
+    - id: nonnegative
+      always: z >= 0

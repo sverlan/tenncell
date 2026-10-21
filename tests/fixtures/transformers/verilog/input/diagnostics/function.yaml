@@ -1,0 +1,5 @@
+# Function calls receive the same located pre-emission diagnostic.
+module:
+  include: [common.yaml]
+rules:
+  - sin(x) -> z

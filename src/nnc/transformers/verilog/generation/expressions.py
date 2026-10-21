@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ....parser.ast import *
 from ....parser.ast.expression import FunctionCallExpression
 from ....model.system import NncSystem
+from ....inputs.yaml.errors import YamlLocatedError
 from ..hardware_config import VerilogEncoding, VerilogLogicEncoding
 from .context import VerilogEmissionContext
 from .literals import emit_constant_expression, emit_constant_in_encoding
@@ -23,9 +24,24 @@ class VerilogExpressionEmitter(_Host):
 
     def _validate_supported_system(self, system: NncSystem):
         """Reject TENNCell constructs that cannot be emitted as Verilog."""
-        for rule in system.rules:
-            self._validate_expression(rule.producer)
-            self._validate_expression(rule.guard)
+        # FSM priority lowering copies later guards into earlier transitions.
+        # Check their source rules before the transitions containing copies.
+        for role, rules in (
+            ("producer", system.rules),
+            ("guard", reversed(system.rules)),
+        ):
+            for rule in rules:
+                try:
+                    self._validate_expression(getattr(rule, role))
+                except ValueError as error:
+                    message = f"{error}\n  in {role} of rule: {rule}"
+                    if rule.source_location is not None:
+                        raise YamlLocatedError(
+                            message,
+                            rule.source_location.source_path,
+                            rule.source_location.line,
+                        ) from error
+                    raise YamlLocatedError(message, system.source_path) from error
 
     def _validate_expression(self, node):
         """Validate that a TENNCell expression can be lowered to Verilog."""

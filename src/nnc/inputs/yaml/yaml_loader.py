@@ -288,7 +288,13 @@ def _build_system_from_raw_document(
             ):
                 nnc.add_rule(rule)
         for rule in lower_fsm_rules(
-            raw_document.fsm, variables, nnc.constants, nnc.aliases, fsm_constants
+            raw_document.fsm,
+            variables,
+            nnc.constants,
+            nnc.aliases,
+            fsm_constants,
+            source_origin=("fsm",),
+            locations=raw_document.locations,
         ):
             nnc.add_rule(rule)
     except Exception as e:
@@ -317,11 +323,17 @@ def _lower_expanded_rule_item(
 ):
     """Lower one expanded rule item and report generated errors at its origin."""
     try:
+        if not isinstance(expanded_rule.value, (str, dict)):
+            raise ValueError(
+                f"Unsupported rule item type: {type(expanded_rule.value).__name__}"
+            )
         return lower_rule_items(
-            [expanded_rule.value],
+            expanded_rule.value,
             variables,
             constants,
             aliases,
+            source_origin=expanded_rule.source_origin or expanded_rule.origin_path,
+            locations=locations,
         )
     except Exception as e:
         raise locations.error(

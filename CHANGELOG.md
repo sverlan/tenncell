@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3
+
+- `nnc-gen -t verilog` and `-t sva` now report unsupported rule expressions with the physical YAML file and rule line, identify the producer or guard, and display the effective rule. This covers variable-by-variable multiplication, general division, and function calls detected before RTL emission, including rules from imports, included fragments, repeats, structured branches, and FSMs.
+- Rule locations survive lowering and moving a rule between systems. Invalid later FSM transition guards are diagnosed at their own transition instead of an earlier transition containing a copied exclusion. Validation checks producers first, then guards in reverse rule order; this can change which diagnostic appears first when several expressions are unsupported. Model execution, arithmetic, FSM priority, and generated RTL behavior are unchanged.
+- Added CLI and library regression coverage and documented the diagnostic contracts and their limits.
+
 ## 0.10.2
 
 - `pdm run typecheck` now checks the whole package (`mypy src/nnc`, 96 files), including the bodies of functions without annotations. It covered about a third before, so the Verilog and Python generators, the YAML loader and the lowering code were unchecked. The emitter mixins declare what they use from each other in one type-only class per backend (`host.py`, no runtime effect), and the errors this uncovered were fixed: reused loop variables, optional values used without narrowing (`ImportConfig.resolved_system`, `VerilogHardwareConfig.require_real_encoding()`), external-module bindings typed as strings, and parser results typed `| Tree` (the parsers now check that they return the AST type they declare; a raw lark tree can only come from a grammar rule without a transformer). Coverage no longer counts `if TYPE_CHECKING:` blocks and the type-only `host.py` modules.
