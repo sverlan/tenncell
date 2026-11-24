@@ -6,6 +6,7 @@ from typing import cast
 
 from .cell import Cell
 from ..inputs.yaml.module_config import ImportConfig, ModuleConfig, connection_number
+from ..inputs.yaml.errors import YamlLocatedError
 from ..inputs.yaml.locations import YamlLocationIndex
 from ..parser.ast import (
     BooleanExpression,
@@ -95,11 +96,24 @@ class NncSystem:
         self.variables.update(cell.contents)
 
     def add_rule(self, rule: Rule):
-        """Append a lowered rule to the system.
+        """Append a lowered rule whose destination is not an input.
 
         Args:
             rule: Lowered rule to append.
+
+        Raises:
+            ValueError: If the rule targets an input variable. YAML-loaded
+                rules include their source location in the diagnostic.
         """
+        name = rule.consumer.name
+        if name in self.input_variables:
+            location = rule.source_location
+            raise YamlLocatedError(
+                f"Rule destination '{name}' is an input variable; "
+                "inputs may only be read by rules",
+                source_path=location.source_path if location else None,
+                line=location.line if location else None,
+            )
         self.rules.append(rule)
 
     def get_variable(self, variable_name):

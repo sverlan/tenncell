@@ -623,3 +623,30 @@ class TestMc2MainContract:
             assert "No MC2 verification entries found" in errors
             assert (out_dir / "fsm_counter_mc2.mc2.pltl").exists()
             assert not (out_dir / "bad.mc2.pltl").exists()
+
+
+@pytest.mark.parametrize("target", ["python", "verilog", "webots", "mc2", "sva"])
+@pytest.mark.parametrize("zero_reset_mode", [False, True])
+def test_input_destination_fails_generation_with_a_located_error(
+    tmp_path, monkeypatch, capsys, target, zero_reset_mode
+):
+    """Every generation target returns failure before emitting an invalid model."""
+    model = tmp_path / "invalid_input_destination.yaml"
+    document = (
+        f"module:\n  zero_reset_mode: {str(zero_reset_mode).lower()}\n"
+        "cells:\n  - id: 1\n    contents:\n      - s1 = 0\n"
+        "    input: [s1]\nrules:\n  - s1 -> s1\n"
+    )
+    model.write_text(document, encoding="utf-8")
+    output = tmp_path / "output"
+    arguments = ["nnc-gen", str(model), "-t", target, "-o", str(output)]
+    if target == "sva":
+        arguments.extend(["--sva-mode", "formal"])
+    monkeypatch.setattr("sys.argv", arguments)
+
+    assert main() == 1
+
+    error = capsys.readouterr().err
+    line = len(document.splitlines())
+    assert f"{model.resolve()}:{line}: Rule destination 's1' is an input" in error
+    assert not list(output.glob("*"))

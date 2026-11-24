@@ -1,0 +1,32 @@
+name: Full suite
+
+# Started by hand from the Actions tab (never by a push, a pull request or a tag):
+# the whole test suite with every opt-in tool (Icarus, Verilator, Yosys and slang,
+# SymbiYosys with suprove, Webots, and the MC2 jar of third_party/mc2), installed by
+# scripts/ci_full_tools.sh. The downloads
+# are cached; the cache key changes with the script, so with the pinned versions.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full:
+    name: Full suite with the opt-in tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/nnc-tools/downloads
+          key: nnc-tools-${{ hashFiles('scripts/ci_full_tools.sh') }}
+      - name: Install the opt-in tools
+        run: sh scripts/ci_full_tools.sh "${HOME}/nnc-tools"
+      - run: python -m pip install pdm==2.29.7
+      - run: pdm sync --dev
+      - run: pdm run test

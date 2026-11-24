@@ -8,6 +8,7 @@
 - `TENNCell` stands for Transformation and Execution of Numerical Networks of Cells.
 - TENNCell is related to numerical P systems and generalizes many of their variants.
 - The PyPI distribution is `tenncell`, and the CLI commands are `nnc-sim` and `nnc-gen`.
+- The package version is the one in `src/nnc/_version.py` (`[tool.pdm.version] source = "file"`); git tags do not set it. PyPI releases are published from the GitHub repository by `.github/workflows/release.yml` on a tag `vX.Y.Z`, which must equal that version and have a `## X.Y.Z` section in `CHANGELOG.md`.
 - The Python package is `nnc`, and its public system class is `NncSystem`.
 
 ## CLI Behavior
@@ -141,6 +142,8 @@
   - imported TENNCell IO: `sensor0.level`
 - Qualified references are parsed directly by the TENNCell parser.
 - Rule consumers must still be local variables in the current implementation.
+- Input variables may be read in rule guards and productions, but must not be rule destinations (the `-> var` or `consumer:` target). Reading an input in a production may still consume and clear it when `zero_reset_mode` is false. `NncSystem.add_rule()` rejects input-target rules regardless of reset mode; use this method to register programmatic rules after declaring inputs. Direct list mutation or later changes to input declarations are not validated by `add_rule()`. YAML loading registers inputs first and validates every rule, including structured rules and rules lowered from `if`, `repeat`, and FSM blocks.
+- Located rule-lowering errors retain their original message and physical source location. Missing file or line metadata is filled from the top-level `rules` location; unlocated exceptions retain the `Error lowering YAML rules` wrapper.
 - Declaring a variable as a cell `output` exposes it through the module interface only; it does not make the variable implicitly consumed, cleared, or recomputed each step.
 - If `module.zero_reset_mode` is `true`, all local variables in that module are cleared to zero on every step before productions are accumulated, regardless of dynamic use.
 

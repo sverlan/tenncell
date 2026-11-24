@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.5
+
+- Releases are published to PyPI from GitHub, and GitHub CI runs the checks and tests on every push and pull request.
+- The package version is read from `src/nnc/_version.py`.
+
+## 0.10.4
+
+- **Behavior change:** rules may no longer target declared input variables, in any backend or reset mode. Such models fail during loading with the destination name and YAML source location. Remove redundant self-loops such as `s1 -> s1` or `s1 * 0 -> s1`. If a rule intentionally consumes internal state while producing into an input, redirect the production to a writable local variable instead; simply deleting that rule would change consumption semantics. Inputs remain legal in guards and production expressions, including consumption in non-zero-reset mode.
+- Located rule-lowering errors now retain their original message and physical source location instead of being wrapped in another `Error lowering YAML rules` message. If a located error lacks file or line metadata, the loader fills it from the top-level `rules` location. Unlocated lowering exceptions retain their existing wrapper.
+
 ## 0.10.3
 
 - `nnc-gen -t verilog` and `-t sva` now report unsupported rule expressions with the physical YAML file and rule line, identify the producer or guard, and display the effective rule. This covers variable-by-variable multiplication, general division, and function calls detected before RTL emission, including rules from imports, included fragments, repeats, structured branches, and FSMs.

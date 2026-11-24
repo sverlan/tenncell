@@ -7,8 +7,8 @@ cells:
     contents:
       - nearest = 0
     input: [nearest]
-rules:
-  - nearest * 0 -> nearest
+rules: []
+# Inputs are supplied externally and cannot be rule destinations.
 webots:
   timestep: 32
   bindings:

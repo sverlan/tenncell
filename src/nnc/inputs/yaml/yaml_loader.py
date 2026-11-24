@@ -7,7 +7,7 @@ from ...model.cell import Cell
 from ...parser import parse_variable_assignment
 from ...parser.ast.value import FloatValue
 from ...parser.ast.variable import Variable
-from .errors import as_yaml_located_error
+from .errors import YamlLocatedError, as_yaml_located_error
 from .includes import load_yaml_with_includes
 from .locations import YamlLocationIndex
 from .lowering import (
@@ -297,6 +297,9 @@ def _build_system_from_raw_document(
             locations=raw_document.locations,
         ):
             nnc.add_rule(rule)
+    except YamlLocatedError as e:
+        fallback = raw_document.locations.error("", "rules")
+        raise as_yaml_located_error(e, fallback.source_path, fallback.line)
     except Exception as e:
         raise as_yaml_located_error(
             raw_document.locations.error(f"Error lowering YAML rules:\n{e}", "rules")

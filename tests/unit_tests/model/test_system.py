@@ -12,6 +12,34 @@ class TestSystem:
         system = NncSystem()
         assert system.rules == []
 
+    @pytest.mark.parametrize("zero_reset_mode", [False, True])
+    def test_add_rule_rejects_input_destination_without_appending(self, zero_reset_mode):
+        """The public model API enforces read-only input destinations."""
+        system = NncSystem()
+        system.module_config.zero_reset_mode = zero_reset_mode
+        sensor = Variable("sensor", 0)
+        system.variables["sensor"] = sensor
+        system.input_variables["sensor"] = sensor
+        rule = Rule(sensor, VariableExpression(sensor), BooleanConstantExpression(True))
+
+        with pytest.raises(ValueError, match="destination 'sensor' is an input"):
+            system.add_rule(rule)
+
+        assert system.rules == []
+
+    def test_add_rule_accepts_an_input_as_a_source(self):
+        """An input can produce a value for a writable local variable."""
+        system = NncSystem()
+        sensor = Variable("sensor", 0)
+        output = Variable("output", 0)
+        system.variables.update(sensor=sensor, output=output)
+        system.input_variables["sensor"] = sensor
+        rule = Rule(output, VariableExpression(sensor), BooleanConstantExpression(True))
+
+        system.add_rule(rule)
+
+        assert system.rules == [rule]
+
 
 class TestRule:
     """Contract tests for the public rule model surface."""

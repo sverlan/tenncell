@@ -35,14 +35,10 @@ nnc-sim = "nnc.__main__:main"
 nnc-gen = "nnc.cli_transform:main"
 nnc-verify = "nnc.cli_verify:main"
 [tool.pdm.version]
-#source = "file"
-#path = "src/nnc/_version.py"
-source = "scm"
-fallback_version = "0.0.0"
-tag_filter = "v*"
-tag_regex = '^v(.*)$'
-write_to = "nnc/_version.py"
-write_template = "__version__ = '{}'"
+# The version is the one line of src/nnc/_version.py, set by the release commit;
+# tags do not decide it (private tags are vX.Y.Z-private, public ones vX.Y.Z).
+source = "file"
+path = "src/nnc/_version.py"
 
 [tool.pdm.scripts]
 # Local tool paths for the opt-in tests (git-ignored; see .env.example).

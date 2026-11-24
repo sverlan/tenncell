@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from nnc import NncSystem
-from nnc.parser.ast.value import FloatValue
 
 
 def test_example1_contract():
@@ -12,6 +11,7 @@ def test_example1_contract():
     assert len(nnc.cells) == 1
     assert len(nnc.rules) == 4
     assert len(nnc.variables) == 5
+    assert list(nnc.input_variables) == ["u"]
 
     u = nnc.get_variable("u")
     x = nnc.get_variable("x")
@@ -37,8 +37,7 @@ def test_example1_contract():
     inputs = [1, 1, 0, 0, 10, 10, 0]
 
     for idx, u_value in enumerate(inputs):
-        u.value = FloatValue(u_value)
-        nnc.step()
+        nnc.step({"u": u_value})
         assert (
             u.value.value,
             x.value.value,

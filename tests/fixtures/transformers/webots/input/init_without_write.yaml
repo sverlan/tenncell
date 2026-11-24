@@ -4,8 +4,8 @@ cells:
     contents:
       - distance = 0
     input: [distance]
-rules:
-  - distance * 0 -> distance
+rules: []
+# Inputs are supplied externally and cannot be rule destinations.
 webots:
   bindings:
     distance:

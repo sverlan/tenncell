@@ -3,6 +3,7 @@
 from pathlib import Path
 import textwrap
 import shutil
+import tempfile
 import uuid
 
 import pytest
@@ -19,13 +20,10 @@ def write_text(path: Path, content: str):
 
 class TempDirContext:
     def __init__(self):
-        self.path = (
-            Path(r"C:\Users\ver\.codex\memories\nump_test_tmp")
-            / f"tmp_{uuid.uuid4().hex}"
-        )
+        self.path = Path(tempfile.gettempdir()) / f"nnc_imports_{uuid.uuid4().hex}"
 
     def __enter__(self):
-        self.path.mkdir(parents=True, exist_ok=False)
+        self.path.mkdir(exist_ok=False)
         return str(self.path)
 
     def __exit__(self, exc_type, exc, tb):
